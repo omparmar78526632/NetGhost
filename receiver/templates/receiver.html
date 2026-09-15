@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetGhost Sender & NetGhost Receiver - Invisible Data Transfer Using Network Steganography</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/netghost.css">
+</head>
+<body data-default-view="receiver">
+  <div class="app-container">
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a9 9 0 0 0-9 9c0 4.97 4.03 9 9 9s9-4.03 9-9a9 9 0 0 0-9-9z"></path>
+            <path d="M9 10h.01"></path>
+            <path d="M15 10h.01"></path>
+            <path d="M12 14c-1.5 0-2.5 1-2.5 1"></path>
+          </svg>
+        </div>
+        <div class="sidebar-logo-text">
+          <h1>NETGHOST</h1>
+          <p>Network Steganography Lab</p>
+        </div>
+      </div>
+
+      <div class="sidebar-section-label">WORKSPACE</div>
+
+      <nav class="sidebar-nav">
+        <a class="nav-item" data-page="overview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          Overview
+        </a>
+        <a class="nav-item" data-page="sender">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          Sender
+        </a>
+        <a class="nav-item active" data-page="receiver">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"></path><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"></path></svg>
+          Receiver
+        </a>
+        <a class="nav-item" data-page="profiler">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          Traffic Profiler
+        </a>
+        <a class="nav-item" data-page="monitor">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+          Packet Monitor
+        </a>
+        <a class="nav-item" data-page="experiments">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10 2v7.31"></path><path d="M14 2v7.31"></path><path d="M8.5 2h7"></path><path d="M14 9.3a6.5 6.5 0 1 1-4 0"></path><path d="M5.52 16h12.96"></path></svg>
+          Experiments
+        </a>
+        <a class="nav-item" data-page="results">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          Results
+        </a>
+        <a class="nav-item" data-page="docs">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          Documentation
+        </a>
+        <a class="nav-item" data-page="settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          Settings
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="lab-mode-badge">
+          <div class="badge-title">
+            <span class="dot"></span>
+            LAB MODE
+          </div>
+          <div class="badge-desc">Controlled Environment</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN WRAPPER -->
+    <div class="main-wrapper">
+      <!-- TOPBAR -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="topbar-menu-toggle" aria-label="Toggle Menu">☰</button>
+          <div class="topbar-status">
+            <span class="status-dot"></span>
+            <span class="status-bold">System ready</span>
+            <span style="color: var(--text-dark);">/</span>
+            <span>Lab session active</span>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <div class="connection-indicator">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+            <span>Connected</span>
+          </div>
+
+          <button class="topbar-icon-btn" aria-label="Notifications">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span class="notification-badge"></span>
+          </button>
+
+          <div class="user-profile-badge">
+            <div class="user-avatar">CT</div>
+            <div class="user-info">
+              <span class="user-name">CNT Lab</span>
+              <span class="user-team">Team 04</span>
+            </div>
+          </div>
+
+          <div class="theme-toggle-switch" id="themeToggle" title="Toggle Light/Dark Theme">
+            <div class="theme-toggle-thumb">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"></circle></svg>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- CONTENT AREA -->
+      <main class="content-area">
+        
+        <!-- =================================================================
+             SCREEN 1: OVERVIEW / CONTROL CENTER
+             ================================================================= -->
+        <section id="view-overview" class="page-view">
+          <div class="page-header">
+            <div>
+              <div class="page-breadcrumb">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                OVERVIEW / CONTROL CENTER
+              </div>
+              <h2 class="page-title">NetGhost Control Center</h2>
+              <p class="page-desc">Network Steganography Experiment Dashboard</p>
+            </div>
+            <div class="session-badge">
+              <span>🕒 SESSION 04 / READY</span>
+            </div>
+          </div>
+
+          <!-- 4 Metric Cards -->
+          <div class="metrics-grid-4">
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">TRANSMISSION STATUS</span>
+                <span class="metric-icon">📡</span>
+              </div>
+              <div class="metric-value">
+                <span class="metric-status-dot blue"></span>
+                READY
+              </div>
+              <div class="metric-subtext">Awaiting transmission configuration</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">CHANNEL</span>
+                <span class="metric-icon">🔀</span>
+              </div>
+              <div class="metric-value" style="font-size: 1.25rem;">IP-ID Header</div>
+              <div class="metric-subtext">Active experiment channel</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">PACKETS</span>
+                <span class="metric-icon">📦</span>
+              </div>
+              <div class="metric-value">128</div>
+              <div class="metric-subtext">Configured packet budget</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">PAYLOAD</span>
+                <span class="metric-icon">💾</span>
+              </div>
+              <div class="metric-value">2.4 KB</div>
+              <div class="metric-subtext">Encrypted payload capacity</div>
+            </div>
+          </div>
+
+          <!-- Experiment Pipeline -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                  Experiment Pipeline
+                </h3>
+                <p>End-to-end packet transformation and recovery path</p>
+              </div>
+              <span class="badge-tag sync" style="padding: 4px 10px;">READY</span>
+            </div>
+
+            <div class="pipeline-track">
+              <div class="pipeline-stage">
+                <div class="pipeline-stage-icon">✈</div>
+                <div class="pipeline-stage-title">Sender</div>
+                <div class="pipeline-stage-status ready">● READY</div>
+              </div>
+              <div class="pipeline-connector">→</div>
+              <div class="pipeline-stage">
+                <div class="pipeline-stage-icon">🔒</div>
+                <div class="pipeline-stage-title">AES-256-GCM</div>
+                <div class="pipeline-stage-status ready">● READY</div>
+              </div>
+              <div class="pipeline-connector">→</div>
+              <div class="pipeline-stage active">
+                <div class="pipeline-stage-icon">📚</div>
+                <div class="pipeline-stage-title">Framing & Fragmentation</div>
+                <div class="pipeline-stage-status active">● ACTIVE</div>
+              </div>
+              <div class="pipeline-connector">→</div>
+              <div class="pipeline-stage success">
+                <div class="pipeline-stage-icon">🔀</div>
+                <div class="pipeline-stage-title">Covert Channel</div>
+                <div class="pipeline-stage-status success">● SUCCESS</div>
+              </div>
+              <div class="pipeline-connector">→</div>
+              <div class="pipeline-stage">
+                <div class="pipeline-stage-icon">🌐</div>
+                <div class="pipeline-stage-title">ICMP Traffic</div>
+                <div class="pipeline-stage-status idle">● IDLE</div>
+              </div>
+              <div class="pipeline-connector">→</div>
+              <div class="pipeline-stage">
+                <div class="pipeline-stage-icon">📡</div>
+                <div class="pipeline-stage-title">Receiver</div>
+                <div class="pipeline-stage-status idle">● IDLE</div>
+              </div>
+              <div class="pipeline-connector">→</div>
+              <div class="pipeline-stage">
+                <div class="pipeline-stage-icon">🧩</div>
+                <div class="pipeline-stage-title">Reassembly</div>
+                <div class="pipeline-stage-status idle">● IDLE</div>
+              </div>
+              <div class="pipeline-connector">→</div>
+              <div class="pipeline-stage">
+                <div class="pipeline-stage-icon">🔓</div>
+                <div class="pipeline-stage-title">Decryption</div>
+                <div class="pipeline-stage-status idle">● IDLE</div>
+              </div>
+            </div>
+
+            <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); margin: 8px 0 14px;">
+              ⚡ PACKET FLOW MONITOR / 8 STAGES
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <button class="btn btn-primary btn-full" data-goto="sender">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                Open Sender
+              </button>
+              <button class="btn btn-secondary btn-full" data-goto="receiver">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"></path></svg>
+                Open Receiver
+              </button>
+            </div>
+          </div>
+
+          <!-- Available Channels -->
+          <div style="margin-top: 24px;">
+            <h3 style="font-size: 1.1rem; color: #fff; margin-bottom: 4px;">Available Channels</h3>
+            <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 16px;">Supported embedding strategies for controlled laboratory experiments.</p>
+
+            <div class="card" style="margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <h4 style="font-size: 0.95rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+                  <span style="color: #60a5fa; font-family: var(--font-mono);">[ ]</span>
+                  IP-ID Header Embedding
+                </h4>
+                <span class="badge-tag completed">Available</span>
+              </div>
+              <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 10px;">Embeds framed data into the IPv4 Identification field.</p>
+              <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
+                PROTOCOL / IPv4 · ICMP
+              </div>
+            </div>
+
+            <div class="card">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <h4 style="font-size: 0.95rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+                  <span style="color: #34d399;">⏱</span>
+                  Temporal IPD
+                </h4>
+                <span class="badge-tag completed">Available</span>
+              </div>
+              <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 10px;">Encodes bits using controlled packet inter-arrival timing.</p>
+              <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
+                PROFILE / TIMING · GMM READY
+              </div>
+            </div>
+          </div>
+
+          <div class="notice-banner info">
+            <span>ⓘ</span>
+            <span>Controlled laboratory experiment — no real-world firewall or DPI bypass claim.</span>
+          </div>
+        </section>
+
+
+        <!-- =================================================================
+             SCREEN 2: SENDER
+             ================================================================= -->
+        <section id="view-sender" class="page-view">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                Sender
+              </h2>
+              <p class="page-desc">Prepare and transmit a steganographic payload in the controlled lab environment.</p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Transmission Configuration</h3>
+                <p>Define the target, channel and protected payload.</p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="senderTargetIp">Target Address</label>
+              <input type="text" id="senderTargetIp" class="form-input cell-mono" value="127.0.0.1" placeholder="127.0.0.1">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="senderSecret">Shared Secret</label>
+              <div class="input-with-icon">
+                <input type="password" id="senderSecret" class="form-input cell-mono" value="demo123" placeholder="Enter passphrase for AES-256-GCM">
+                <button type="button" class="input-icon-right" id="toggleSecretVisibility" title="Toggle visibility">👁️</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="senderMode">Transmission Mode</label>
+              <select id="senderMode" class="form-select">
+                <option value="header" selected>IP-ID Header Embedding</option>
+                <option value="temporal">Temporal IPD</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="timingProfileGroup" style="display: none;">
+              <label class="form-label" for="senderTimingProfile">Timing Profile</label>
+              <select id="senderTimingProfile" class="form-select">
+                <option value="normal" selected>Normal / Variable Load</option>
+                <option value="constant">Constant Delay</option>
+                <option value="gmm">GMM Fitted Distribution</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Packet Protocol</label>
+              <input type="text" class="form-input cell-mono" value="IPv4 / ICMP" readonly>
+            </div>
+
+            <div class="form-group">
+              <div class="form-label">
+                <span>Payload Message</span>
+                <span id="charCount" class="cell-mono" style="font-size: 0.76rem; color: var(--text-muted);">39 / 4096</span>
+              </div>
+              <textarea id="senderMessage" class="form-textarea" placeholder="Enter secret message to transmit...">Network steganography test successful.</textarea>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 20px;">
+              <button class="btn btn-primary" id="btnPrepareTransmit" style="flex: 1;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                Encrypt & Prepare Transmission
+              </button>
+              <button class="btn btn-secondary" id="btnClearSender">Clear</button>
+            </div>
+          </div>
+
+          <!-- Transmission Preview -->
+          <div class="card" id="transmissionPreview">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Transmission Preview</h3>
+                <p>Authenticated payload summary and packet construction.</p>
+              </div>
+              <span class="badge-tag running" style="padding: 4px 10px;">Ready</span>
+            </div>
+
+            <div class="grid-2" style="margin-bottom: 16px;">
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Plaintext</div>
+                <div class="cell-mono" style="font-size: 1.1rem; color: #fff; margin: 4px 0;">•••••••••••••••</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">summarized</div>
+              </div>
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Encrypted Payload</div>
+                <div style="font-size: 0.9rem; font-weight: 600; color: #fff; margin: 4px 0;">Nonce + Ciphertext + Authentication Tag</div>
+              </div>
+            </div>
+
+            <div class="grid-3" style="margin-bottom: 20px;">
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Payload Size</div>
+                <div class="cell-mono" id="previewPayloadSize" style="font-size: 1.3rem; font-weight: 700; color: #fff;">2,432 bytes</div>
+              </div>
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Fragments</div>
+                <div class="cell-mono" id="previewFragments" style="font-size: 1.3rem; font-weight: 700; color: #fff;">128</div>
+              </div>
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Channel</div>
+                <div id="previewModeLabel" style="font-size: 0.95rem; font-weight: 600; color: #fff; margin-top: 4px;">IP-ID Header Embedding</div>
+              </div>
+            </div>
+
+            <!-- Fragment flow breadcrumbs -->
+            <div style="background-color: #0c0d12; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 16px; font-family: var(--font-mono); font-size: 0.76rem; color: #9ca3af; overflow-x: auto; white-space: nowrap;">
+              <span style="color:#fff;">Fragment 01</span> <span style="color:#3b82f6;">→</span>
+              <span style="color:#fff;">Fragment 02</span> <span style="color:#3b82f6;">→</span>
+              <span style="color:#fff;">Fragment 03</span> <span style="color:#3b82f6;">→</span>
+              <span>...</span> <span style="color:#3b82f6;">→</span>
+              <span style="color:#fff;">Fragment 128</span>
+            </div>
+
+            <!-- IPv4 Packet Detail box -->
+            <div class="packet-tree-box" style="margin-bottom: 20px;">
+              <div class="packet-tree-header">
+                <span style="font-weight: 600; color: #fff;">IPv4 Packet</span>
+                <span class="cell-mono" style="font-size: 0.74rem; color: var(--text-muted);">ICMP / 74 B</span>
+              </div>
+              <div style="padding: 12px 16px; font-family: var(--font-mono); font-size: 0.8rem; display: flex; flex-direction: column; gap: 6px;">
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: var(--text-muted);">Source</span>
+                  <span style="color: #fff;">127.0.0.1</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: var(--text-muted);">Destination</span>
+                  <span style="color: #fff;">127.0.0.1</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: var(--text-muted);">Protocol</span>
+                  <span style="color: #fff;">ICMP</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; background-color: rgba(37, 99, 235, 0.12); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(37, 99, 235, 0.3);">
+                  <span style="color: #93c5fd; font-weight: 600;">Identification</span>
+                  <span style="color: #60a5fa; font-weight: 700;">0xDEAD</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Transmission Progress Bar -->
+            <div style="margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.78rem; font-family: var(--font-mono); margin-bottom: 6px;">
+                <span id="senderProgressLabel">47 / 128 packets</span>
+                <span>37%</span>
+              </div>
+              <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="senderProgressBar" style="width: 37%;"></div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+              <button class="btn btn-primary" id="btnStartSend" style="flex: 1;">
+                <span>▶</span> Transmit Stream
+              </button>
+              <button class="btn btn-secondary" style="color: #34d399;" title="Status Valid">✓</button>
+            </div>
+          </div>
+
+          <div class="notice-banner info">
+            <span>ⓘ</span>
+            <span>AES-256-GCM is represented here as a UI workflow stage. Full cryptographic verification is active.</span>
+          </div>
+        </section>
+
+
+        <!-- =================================================================
+             SCREEN 3: RECEIVER
+             ================================================================= -->
+        <section id="view-receiver" class="page-view active">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"></path><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"></path></svg>
+                Receiver
+              </h2>
+              <p class="page-desc">Capture, decode and reconstruct incoming NetGhost traffic.</p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Capture Configuration</h3>
+                <p>Define the controlled interface and channel used for packet acquisition.</p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="receiverInterface">Capture Interface</label>
+              <select id="receiverInterface" class="form-select">
+                <option value="lo0" selected>lo0 — Loopback</option>
+                <option value="eth0">Ethernet adapter</option>
+                <option value="wlan0">Wi-Fi adapter</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="receiverListenAddress">Listen Address</label>
+              <input type="text" id="receiverListenAddress" class="form-input cell-mono" value="127.0.0.1">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="receiverSecret">Shared Secret (PSK)</label>
+              <input type="password" id="receiverSecret" class="form-input cell-mono" value="demo123" placeholder="Enter matching secret passphrase">
+            </div>
+
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label" for="receiverChannel">Channel</label>
+                <select id="receiverChannel" class="form-select">
+                  <option value="header" selected>Auto Detect (IP-ID)</option>
+                  <option value="temporal">Temporal IPD</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="receiverDuration">Capture Duration</label>
+                <input type="text" id="receiverDuration" class="form-input cell-mono" value="30 s">
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 10px;">
+              <button class="btn btn-primary" id="btnStartReceiver">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                Start Capture
+              </button>
+              <button class="btn btn-secondary" id="btnStopReceiver" disabled>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                Stop Capture
+              </button>
+            </div>
+          </div>
+
+          <!-- Live Capture Table (Screenshots 5 & 6) -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Live Capture</h3>
+                <p>Incoming packet observation stream</p>
+              </div>
+              <div id="receiverLiveBadge" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; color: #10b981; font-family: var(--font-mono);">
+                <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981;"></span>
+                LIVE 128 packets observed
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Source</th>
+                    <th>Destination</th>
+                    <th>Protocol</th>
+                    <th>IP ID</th>
+                    <th>Packet Size</th>
+                    <th>Inter-arrival</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="receiverLiveTableBody">
+                  <tr class="placeholder-row">
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 18px;">
+                      Awaiting incoming packet stream... Click "Start Capture" to begin.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Decoding Progress -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Decoding Progress</h3>
+                <p>Receiver pipeline validation and reconstruction state.</p>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.86rem;">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
+                <span style="color: var(--text-secondary);">Synchronization</span>
+                <span id="statusSync" style="color: var(--text-muted);">Awaiting...</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
+                <span style="color: var(--text-secondary);">Framing</span>
+                <span id="statusFraming" style="color: var(--text-muted);">Awaiting...</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
+                <span style="color: var(--text-secondary);">Fragments</span>
+                <span id="statusFragments" class="cell-mono" style="color: var(--text-muted);">0 packets</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
+                <span style="color: var(--text-secondary);">Reassembly</span>
+                <span id="statusReassembly" class="cell-mono" style="color: var(--text-muted);">0%</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
+                <span style="color: var(--text-secondary);">Authentication</span>
+                <span id="statusAuth" style="color: var(--text-muted);">Awaiting...</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-secondary);">Decryption</span>
+                <span id="statusDecrypt" style="color: var(--text-muted);">Awaiting...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recovered Message -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Recovered Message</h3>
+                <p>Authenticated plaintext reconstructed from the capture.</p>
+              </div>
+            </div>
+
+            <div class="terminal-card" id="receiverDecodedText">
+              <span style="color: var(--text-muted); font-style: italic;">Awaiting incoming transmission stream...</span>
+            </div>
+
+            <div style="margin-top: 14px;">
+              <button class="btn btn-secondary" id="btnExportResult">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Export Result
+              </button>
+            </div>
+          </div>
+
+          <div class="notice-banner error" id="receiverAuthErrorBanner" style="display: none;">
+            <span>⚠</span>
+            <span id="receiverAuthErrorText">Authentication failed. The recovered payload could not be verified.</span>
+          </div>
+        </section>
+
+
+        <!-- =================================================================
+             SCREEN 4: TRAFFIC PROFILER
+             ================================================================= -->
+        <section id="view-profiler" class="page-view">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                Traffic Profiler
+              </h2>
+              <p class="page-desc">Analyze baseline packet timing and generate a statistical timing profile.</p>
+            </div>
+            <div class="badge-tag completed" style="padding: 6px 12px;">
+              <span>🛡 Controlled laboratory environment</span>
+            </div>
+          </div>
+
+          <!-- Baseline PCAP -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Baseline PCAP</h3>
+                <p>Import reference traffic for timing analysis or select a benchmark preset.</p>
+              </div>
+              <span style="color: var(--text-muted); font-size: 14px;">📄</span>
+            </div>
+
+            <input type="file" id="pcapFileInput" accept=".pcap,.pcapng,.cap,.csv,.txt" style="display: none;">
+
+            <div id="pcapDropzone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 32px 20px; text-align: center; cursor: pointer; transition: var(--transition); margin-bottom: 16px;">
+              <div style="font-size: 28px; color: #3b82f6; margin-bottom: 8px;">☁</div>
+              <div id="pcapDropzoneTitle" style="font-size: 0.95rem; font-weight: 600; color: #fff; margin-bottom: 6px;">Click to Browse or Drop PCAP / CSV file here</div>
+              <div id="pcapDropzoneSub" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">Supports Wireshark .pcap, .pcapng, and comma-separated delay .csv</div>
+              <div style="display: flex; gap: 8px; justify-content: center;">
+                <span class="badge-tag" style="background: #171a25; color: var(--text-secondary);">.pcap</span>
+                <span class="badge-tag" style="background: #171a25; color: var(--text-secondary);">.pcapng</span>
+                <span class="badge-tag" style="background: #171a25; color: var(--text-secondary);">.csv</span>
+              </div>
+            </div>
+
+            <!-- 1-Click Benchmark Presets -->
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; align-items: center;">
+              <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Or Load Benchmark Preset:</span>
+              <button class="btn btn-secondary" id="btnPresetHttp" style="padding: 5px 12px; font-size: 0.8rem;">🌐 Web HTTP (12,480 pkts)</button>
+              <button class="btn btn-secondary" id="btnPresetVideo" style="padding: 5px 12px; font-size: 0.8rem;">🎥 Video Stream (8,300 pkts)</button>
+              <button class="btn btn-secondary" id="btnPresetDns" style="padding: 5px 12px; font-size: 0.8rem;">📡 DNS Telemetry (7,000 pkts)</button>
+            </div>
+
+            <div class="progress-bar-container" style="margin-bottom: 20px;">
+              <div class="progress-bar-fill" id="pcapProgressFill" style="width: 100%;"></div>
+            </div>
+
+            <div class="grid-5">
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Packets</div>
+                <div class="cell-mono" id="pcapPackets" style="font-size: 1.25rem; font-weight: 700; color: #fff;">12,480</div>
+              </div>
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Duration</div>
+                <div class="cell-mono" id="pcapDuration" style="font-size: 1.25rem; font-weight: 700; color: #fff;">00:04:32</div>
+              </div>
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Average IPD</div>
+                <div class="cell-mono" id="pcapAvgIpd" style="font-size: 1.25rem; font-weight: 700; color: #fff;">21.7 ms</div>
+              </div>
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Median IPD</div>
+                <div class="cell-mono" id="pcapMedianIpd" style="font-size: 1.25rem; font-weight: 700; color: #fff;">18.2 ms</div>
+              </div>
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Jitter</div>
+                <div class="cell-mono" id="pcapJitter" style="font-size: 1.25rem; font-weight: 700; color: #fff;">6.4 ms</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- GMM Model -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>GMM Model</h3>
+                <p>Statistical model for generated timing.</p>
+              </div>
+              <span style="color: var(--text-muted); font-size: 14px;">🎛</span>
+            </div>
+
+            <div style="background-color: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <span style="color: var(--text-secondary); font-size: 0.85rem;">Model Status</span>
+              <span class="metric-status-dot green"></span>
+            </div>
+
+            <div class="grid-3" style="margin-bottom: 18px;">
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Components</div>
+                <div class="cell-mono" style="font-size: 1.2rem; font-weight: 700; color: #fff;">3</div>
+              </div>
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Feature</div>
+                <div style="font-size: 0.9rem; font-weight: 600; color: #fff;">Packet Inter-arrival Time</div>
+              </div>
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Model File</div>
+                <div class="cell-mono" style="font-size: 0.88rem; color: #60a5fa;">timing_gmm.joblib</div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 12px;">
+              <button class="btn btn-primary" id="btnTrainGmm">Train Model</button>
+              <button class="btn btn-secondary" id="btnLoadGmm">📁 Load Model</button>
+            </div>
+          </div>
+
+          <!-- Inter-arrival Time Distribution Chart -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Inter-arrival Time Distribution</h3>
+                <p>Baseline packet timing with fitted Gaussian mixture components.</p>
+              </div>
+              <div class="chart-legend">
+                <div class="legend-item"><span class="legend-color" style="background:#06b6d4;"></span> Histogram</div>
+                <div class="legend-item"><span class="legend-color" style="background:#3b82f6;"></span> GMM component 1</div>
+                <div class="legend-item"><span class="legend-color" style="background:#06b6d4;"></span> GMM component 2</div>
+                <div class="legend-item"><span class="legend-color" style="background:#a855f7;"></span> GMM component 3</div>
+              </div>
+            </div>
+
+            <div class="chart-canvas-wrapper" style="height: 200px;">
+              <canvas id="profilerDistributionCanvas"></canvas>
+            </div>
+          </div>
+
+          <!-- Generated Timing Profile -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Generated Timing Profile</h3>
+                <p>Synthesized timing characteristics from the fitted model.</p>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-secondary" id="tabRawData" style="padding: 4px 12px; font-size: 0.78rem;">Raw Data</button>
+                <button class="btn btn-primary" id="tabGmmProfile" style="padding: 4px 12px; font-size: 0.78rem;">GMM Profile</button>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="background-color: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-muted); font-size: 0.8rem;">Mean</span>
+                <span class="cell-mono" style="font-size: 1.15rem; font-weight: 700; color: #fff;">24.6 ms</span>
+              </div>
+              <div style="background-color: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-muted); font-size: 0.8rem;">Median</span>
+                <span class="cell-mono" style="font-size: 1.15rem; font-weight: 700; color: #fff;">20.1 ms</span>
+              </div>
+              <div style="background-color: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-muted); font-size: 0.8rem;">Std. Deviation</span>
+                <span class="cell-mono" style="font-size: 1.15rem; font-weight: 700; color: #fff;">8.8 ms</span>
+              </div>
+              <div style="background-color: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-muted); font-size: 0.8rem;">Minimum</span>
+                <span class="cell-mono" style="font-size: 1.15rem; font-weight: 700; color: #fff;">5.0 ms</span>
+              </div>
+              <div style="background-color: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-muted); font-size: 0.8rem;">Maximum</span>
+                <span class="cell-mono" style="font-size: 1.15rem; font-weight: 700; color: #fff;">72.4 ms</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- =================================================================
+             SCREEN 5: PACKET MONITOR
+             ================================================================= -->
+        <section id="view-monitor" class="page-view">
+          <div class="page-header">
+            <div>
+              <div class="page-breadcrumb">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect></svg>
+                PACKET ANALYSIS
+              </div>
+              <h2 class="page-title">Packet Monitor</h2>
+              <p class="page-desc">Inspect captured packets and channel-relevant fields.</p>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap;">
+            <button class="btn btn-primary" id="btnMonitorStart">▶ Start Capture</button>
+            <button class="btn btn-secondary" id="btnMonitorStop">⏹ Stop Capture</button>
+            <button class="btn btn-secondary" id="btnMonitorClear">🗑 Clear</button>
+            <button class="btn btn-secondary" id="btnMonitorExport">⬇ Export PCAP</button>
+          </div>
+
+          <!-- Filters -->
+          <div class="card" style="padding: 16px 20px;">
+            <div class="grid-4" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;">
+              <div>
+                <label class="form-label">Protocol</label>
+                <input type="text" class="form-input cell-mono" value="ICMP" readonly>
+              </div>
+              <div>
+                <label class="form-label">Source</label>
+                <input type="text" class="form-input cell-mono" value="127.0.0.1" readonly>
+              </div>
+              <div>
+                <label class="form-label">Destination</label>
+                <input type="text" class="form-input cell-mono" value="127.0.0.1" readonly>
+              </div>
+              <div>
+                <label class="form-label">Packet Type</label>
+                <input type="text" class="form-input" value="Data" readonly>
+              </div>
+            </div>
+          </div>
+
+          <!-- Captured packets table -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Captured packets</h3>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>No.</th>
+                    <th>Time</th>
+                    <th>Source</th>
+                    <th>Destination</th>
+                    <th>Protocol</th>
+                    <th>Length</th>
+                    <th>IP ID</th>
+                    <th>Δt</th>
+                    <th>Channel</th>
+                  </tr>
+                </thead>
+                <tbody id="monitorTableBody">
+                  <tr data-packet-no="001" data-packet-time="10:32:14.102" data-packet-size="74" data-packet-ipid="0xDEAD">
+                    <td class="cell-mono">001</td>
+                    <td class="cell-mono">10:32:14.102</td>
+                    <td class="cell-mono">127.0.0.1</td>
+                    <td class="cell-mono">127.0.0.1</td>
+                    <td><span class="badge-tag data">ICMP</span></td>
+                    <td class="cell-mono">74 B</td>
+                    <td class="cell-mono" style="color:#60a5fa;">0xDEAD</td>
+                    <td class="cell-mono">—</td>
+                    <td class="cell-mono">Sync</td>
+                  </tr>
+                  <tr class="selected" data-packet-no="002" data-packet-time="10:32:14.152" data-packet-size="74" data-packet-ipid="0x0048">
+                    <td class="cell-mono" style="color:#60a5fa; font-weight:700;">002</td>
+                    <td class="cell-mono">10:32:14.152</td>
+                    <td class="cell-mono">127.0.0.1</td>
+                    <td class="cell-mono">127.0.0.1</td>
+                    <td><span class="badge-tag data" style="background:#2563eb; color:#fff;">ICMP</span></td>
+                    <td class="cell-mono">74 B</td>
+                    <td class="cell-mono" style="color:#60a5fa; font-weight:700;">0x0048</td>
+                    <td class="cell-mono">50 ms</td>
+                    <td class="cell-mono" style="color:#60a5fa;">IP-ID</td>
+                  </tr>
+                  <tr data-packet-no="003" data-packet-time="10:32:14.252" data-packet-size="74" data-packet-ipid="0x00A1">
+                    <td class="cell-mono">003</td>
+                    <td class="cell-mono">10:32:14.252</td>
+                    <td class="cell-mono">127.0.0.1</td>
+                    <td class="cell-mono">127.0.0.1</td>
+                    <td><span class="badge-tag data">ICMP</span></td>
+                    <td class="cell-mono">74 B</td>
+                    <td class="cell-mono" style="color:#60a5fa;">0x00A1</td>
+                    <td class="cell-mono">100 ms</td>
+                    <td class="cell-mono">IP-ID</td>
+                  </tr>
+                  <tr data-packet-no="004" data-packet-time="10:32:14.302" data-packet-size="74" data-packet-ipid="0x003C">
+                    <td class="cell-mono">004</td>
+                    <td class="cell-mono">10:32:14.302</td>
+                    <td class="cell-mono">127.0.0.1</td>
+                    <td class="cell-mono">127.0.0.1</td>
+                    <td><span class="badge-tag data">ICMP</span></td>
+                    <td class="cell-mono">74 B</td>
+                    <td class="cell-mono" style="color:#60a5fa;">0x003C</td>
+                    <td class="cell-mono">50 ms</td>
+                    <td class="cell-mono">IP-ID</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div style="margin-top: 12px; font-size: 0.76rem; color: #60a5fa; display: flex; align-items: center; gap: 6px;">
+              <span>●</span>
+              <span>Identification highlighted for IP-ID channel analysis.</span>
+            </div>
+          </div>
+
+          <!-- Deep Packet Inspector Tree -->
+          <div class="card" id="packetInspectorCard">
+            <div class="card-header">
+              <div>
+                <h3 id="inspectorPacketTitle" style="font-size: 1.1rem; color: #fff;">Packet 002</h3>
+                <p id="inspectorPacketSub" class="cell-mono" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
+                  10:32:14.152 · 74 bytes
+                </p>
+              </div>
+              <span class="badge-tag running" style="padding: 4px 10px;">Selected</span>
+            </div>
+
+            <div class="packet-tree-box">
+              <div class="packet-layer-item">
+                <div class="packet-layer-header">
+                  <span style="display: flex; align-items: center; gap: 8px;">
+                    <span>🔀</span> Ethernet
+                  </span>
+                  <span class="layer-arrow">›</span>
+                </div>
+                <div class="packet-layer-body">
+                  <div class="field-kv-grid">
+                    <div class="field-kv-item"><span class="field-kv-key">Destination MAC</span><span class="field-kv-val">00:00:00:00:00:00</span></div>
+                    <div class="field-kv-item"><span class="field-kv-key">Source MAC</span><span class="field-kv-val">00:00:00:00:00:00</span></div>
+                    <div class="field-kv-item"><span class="field-kv-key">EtherType</span><span class="field-kv-val">0x0800 (IPv4)</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="packet-layer-item">
+                <div class="packet-layer-header">
+                  <span style="display: flex; align-items: center; gap: 8px; color: #60a5fa;">
+                    <span>🌐</span> IPv4
+                  </span>
+                  <span class="layer-arrow">⌵</span>
+                </div>
+                <div class="packet-layer-body open">
+                  <div class="field-kv-grid">
+                    <div class="field-kv-item"><span class="field-kv-key">Version</span><span class="field-kv-val">4</span></div>
+                    <div class="field-kv-item"><span class="field-kv-key">IHL</span><span class="field-kv-val">5</span></div>
+                    <div class="field-kv-item"><span class="field-kv-key">TTL</span><span class="field-kv-val">64</span></div>
+                    <div class="field-kv-item"><span class="field-kv-key">Protocol</span><span class="field-kv-val">ICMP</span></div>
+                    <div class="field-kv-item" style="grid-column: span 2;">
+                      <span class="field-kv-key" style="color:#93c5fd; font-weight:600;">Identification</span>
+                      <span class="field-kv-val highlight-pill" id="inspectorIpIdBadge">0x0048</span>
+                    </div>
+                    <div class="field-kv-item"><span class="field-kv-key">Flags</span><span class="field-kv-val">0x0000</span></div>
+                    <div class="field-kv-item"><span class="field-kv-key">Fragment Offset</span><span class="field-kv-val">0</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="packet-layer-item">
+                <div class="packet-layer-header">
+                  <span style="display: flex; align-items: center; gap: 8px;">
+                    <span>⚡</span> ICMP
+                  </span>
+                  <span class="layer-arrow">›</span>
+                </div>
+                <div class="packet-layer-body">
+                  <div class="field-kv-grid">
+                    <div class="field-kv-item"><span class="field-kv-key">Type</span><span class="field-kv-val">8 (Echo Request)</span></div>
+                    <div class="field-kv-item"><span class="field-kv-key">Code</span><span class="field-kv-val">0</span></div>
+                    <div class="field-kv-item"><span class="field-kv-key">Checksum</span><span class="field-kv-val">0x4F12</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="packet-layer-item">
+                <div class="packet-layer-header">
+                  <span style="display: flex; align-items: center; gap: 8px;">
+                    <span>💾</span> Payload
+                  </span>
+                  <span class="layer-arrow">›</span>
+                </div>
+                <div class="packet-layer-body">
+                  <div class="cell-mono" style="font-size: 0.76rem; color: #9ca3af; word-break: break-all;">
+                    4e657447686f7374204c6162205061796c6f616420547261666669632e2e2e
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- =================================================================
+             SCREEN 6: EXPERIMENTS
+             ================================================================= -->
+        <section id="view-experiments" class="page-view">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M10 2v7.31"></path><path d="M14 2v7.31"></path><path d="M8.5 2h7"></path><path d="M14 9.3a6.5 6.5 0 1 1-4 0"></path><path d="M5.52 16h12.96"></path></svg>
+                Experiments
+              </h2>
+              <p class="page-desc">Configure, run and compare controlled NetGhost laboratory sessions.</p>
+            </div>
+            <div class="page-actions">
+              <select class="form-select" style="width: 140px; padding: 7px 10px;">
+                <option selected>All channels</option>
+                <option>IP-ID</option>
+                <option>Temporal IPD</option>
+              </select>
+              <button class="btn btn-primary" id="btnNewExperiment">+ New Experiment</button>
+            </div>
+          </div>
+
+          <!-- Summary Metrics 4 Grid -->
+          <div class="metrics-grid-4">
+            <div class="metric-card">
+              <div class="metric-label">Active sessions</div>
+              <div class="metric-value">03</div>
+              <div class="metric-subtext" style="color:#10b981;">Controlled lab runs</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Completed</div>
+              <div class="metric-value">18</div>
+              <div class="metric-subtext">Across all channels</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Review queue</div>
+              <div class="metric-value">02</div>
+              <div class="metric-subtext" style="color:#f59e0b;">Needs observation</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Repeatability</div>
+              <div class="metric-value">98.7%</div>
+              <div class="metric-subtext" style="color:#10b981;">Session consistency</div>
+            </div>
+          </div>
+
+          <!-- Experiment Registry -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Experiment registry</h3>
+                <p>Controlled sessions and comparative observations</p>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">
+                ↻ Last synced 14 Mar 2025
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>Experiment Name</th>
+                    <th>Channel</th>
+                    <th>Payload</th>
+                    <th>Packets</th>
+                    <th>Timing Profile</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="experimentTableBody">
+                  <tr data-status="Completed">
+                    <td style="font-weight: 600; color: #fff;">Header Embedding Test</td>
+                    <td class="cell-mono">IP-ID</td>
+                    <td class="cell-mono" style="font-weight:600;">2.4 KB</td>
+                    <td class="cell-mono" style="font-weight:600;">128</td>
+                    <td>Normal</td>
+                    <td><span class="badge-tag completed">Completed</span></td>
+                    <td style="color: var(--text-muted);">14 Mar 2025</td>
+                    <td></td>
+                  </tr>
+                  <tr data-status="Completed">
+                    <td style="font-weight: 600; color: #fff;">Temporal Channel Test</td>
+                    <td class="cell-mono">Temporal IPD</td>
+                    <td class="cell-mono" style="font-weight:600;">1.8 KB</td>
+                    <td class="cell-mono" style="font-weight:600;">256</td>
+                    <td>GMM</td>
+                    <td><span class="badge-tag completed">Completed</span></td>
+                    <td style="color: var(--text-muted);">13 Mar 2025</td>
+                    <td><a href="#" class="btn btn-ghost" style="padding: 2px 6px; font-size: 0.76rem;">👁 View</a></td>
+                  </tr>
+                  <tr data-status="Review">
+                    <td style="font-weight: 600; color: #fff;">Authentication Recovery Check</td>
+                    <td class="cell-mono">IP-ID</td>
+                    <td class="cell-mono" style="font-weight:600;">512 B</td>
+                    <td class="cell-mono" style="font-weight:600;">32</td>
+                    <td>Constant</td>
+                    <td><span class="badge-tag review">Review</span></td>
+                    <td style="color: var(--text-muted);">12 Mar 2025</td>
+                    <td><a href="#" class="btn btn-ghost" style="padding: 2px 6px; font-size: 0.76rem;">👁 View</a></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+              <div style="font-size: 0.78rem; color: var(--text-muted);">3 experiments shown</div>
+              <div style="display: flex; gap: 6px;">
+                <span class="badge-tag completed exp-filter-tag" data-status="Completed" style="cursor: pointer;">Completed</span>
+                <span class="badge-tag running exp-filter-tag" data-status="Running" style="cursor: pointer;">Running</span>
+                <span class="badge-tag review exp-filter-tag" data-status="Review" style="cursor: pointer;">Review</span>
+                <span class="badge-tag failed exp-filter-tag" data-status="Failed" style="cursor: pointer;">Failed</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- =================================================================
+             SCREEN 7: RESULTS
+             ================================================================= -->
+        <section id="view-results" class="page-view">
+          <div class="page-header">
+            <div>
+              <div class="page-breadcrumb">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                EVALUATION WORKSPACE
+              </div>
+              <h2 class="page-title">Experiment Results</h2>
+              <p class="page-desc">Compare measured outcomes from controlled transmission experiments.</p>
+            </div>
+            <div class="page-actions">
+              <select class="form-select" style="width: 150px; padding: 7px 10px;">
+                <option selected>All experiments</option>
+              </select>
+              <button class="btn btn-primary" id="btnExportReport">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Export Report
+              </button>
+            </div>
+          </div>
+
+          <!-- 4 Metrics Grid -->
+          <div class="metrics-grid-4">
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">Transmission Accuracy</span>
+                <span class="metric-icon">🎯</span>
+              </div>
+              <div class="metric-value">98.7%</div>
+              <div class="metric-subtext" style="color:#10b981;">Measured recovery outcome</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">Packets Recovered</span>
+                <span class="metric-icon">📦</span>
+              </div>
+              <div class="metric-value">126 <span style="font-size: 1.1rem; color: var(--text-muted); font-weight: normal;">/ 128</span></div>
+              <div class="metric-subtext">Captured packet set</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">Payload Integrity</span>
+                <span class="metric-icon">🛡</span>
+              </div>
+              <div class="metric-value" style="font-size: 1.25rem;">
+                <span class="badge-tag completed" style="font-size: 0.82rem;">Valid</span>
+              </div>
+              <div class="metric-subtext">Authentication verified</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">Average Inter-packet Delay</span>
+                <span class="metric-icon">⏱</span>
+              </div>
+              <div class="metric-value">74<span style="font-size: 1rem; color: var(--text-muted); font-weight: normal; margin-left: 2px;">ms</span></div>
+              <div class="metric-subtext">Observed timing average</div>
+            </div>
+          </div>
+
+          <!-- 2x2 High-Fidelity Charts -->
+          <div class="grid-2" style="margin-bottom: 20px;">
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <div class="chart-title">Packet Recovery Rate</div>
+                  <div class="chart-subtitle">Recovered packets over transmission sequence</div>
+                </div>
+                <div class="chart-legend">
+                  <div class="legend-item"><span class="legend-color" style="background:#3b82f6;"></span> Recovery rate</div>
+                </div>
+              </div>
+              <div class="cell-mono" style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 8px;">98.7%</div>
+              <div class="chart-canvas-wrapper">
+                <canvas id="chartRecoveryRate"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <div class="chart-title">Transmission Time</div>
+                  <div class="chart-subtitle">Elapsed time by experiment stage</div>
+                </div>
+                <div class="chart-legend">
+                  <div class="legend-item"><span class="legend-color" style="background:#10b981;"></span> Duration</div>
+                </div>
+              </div>
+              <div class="cell-mono" style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 8px;">9.4 s</div>
+              <div class="chart-canvas-wrapper">
+                <canvas id="chartTransmissionTime"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <div class="chart-title">Inter-arrival Time</div>
+                  <div class="chart-subtitle">Observed packet timing distribution</div>
+                </div>
+                <div class="chart-legend">
+                  <div class="legend-item"><span class="legend-color" style="background:#10b981;"></span> Mean IPD</div>
+                </div>
+              </div>
+              <div class="cell-mono" style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 8px;">74 ms</div>
+              <div class="chart-canvas-wrapper">
+                <canvas id="chartInterArrival"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <div class="chart-title">Payload Size vs Packets</div>
+                  <div class="chart-subtitle">Payload growth across sampled runs</div>
+                </div>
+                <div class="chart-legend">
+                  <div class="legend-item"><span class="legend-color" style="background:#a855f7;"></span> Sampled runs</div>
+                </div>
+              </div>
+              <div class="cell-mono" style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 8px;">2.4 KB</div>
+              <div class="chart-canvas-wrapper">
+                <canvas id="chartPayloadGrowth"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Channel Comparison Matrix Table -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Channel Comparison</h3>
+                <p>Measured characteristics across controlled channel implementations.</p>
+              </div>
+              <span class="badge-tag" style="background: #181b27; color: var(--text-muted); border: 1px solid var(--border-color);">
+                Illustrative evaluation
+              </span>
+            </div>
+
+            <div class="table-container">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>METRIC</th>
+                    <th>IP-ID HEADER</th>
+                    <th>TEMPORAL IPD</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="font-weight: 600; color: #fff;">Capacity</td>
+                    <td>Medium</td>
+                    <td>High</td>
+                  </tr>
+                  <tr>
+                    <td style="font-weight: 600; color: #fff;">Reliability</td>
+                    <td>High</td>
+                    <td>Medium</td>
+                  </tr>
+                  <tr>
+                    <td style="font-weight: 600; color: #fff;">Timing Sensitivity</td>
+                    <td>Low</td>
+                    <td>High</td>
+                  </tr>
+                  <tr>
+                    <td style="font-weight: 600; color: #fff;">Packet Modification</td>
+                    <td>Protocol field modification</td>
+                    <td>Timing variation</td>
+                  </tr>
+                  <tr>
+                    <td style="font-weight: 600; color: #fff;">Detection Considerations</td>
+                    <td>Experimental observability of IPv4 ID changes</td>
+                    <td>Experimental observability of timing patterns</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: var(--text-dark); margin-top: 14px;">
+            <span>Results are illustrative UI data for a controlled laboratory evaluation.</span>
+            <span>🔒 Computer Network Technology Course Project</span>
+          </div>
+        </section>
+
+
+        <!-- =================================================================
+             SCREEN 8: DOCUMENTATION
+             ================================================================= -->
+        <section id="view-docs" class="page-view">
+          <div class="page-header">
+            <div>
+              <div class="page-breadcrumb">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                TECHNICAL REFERENCE
+              </div>
+              <h2 class="page-title">Documentation</h2>
+              <p class="page-desc">NetGhost architecture, channel methods and laboratory workflow.</p>
+            </div>
+          </div>
+
+          <div class="docs-layout">
+            <div class="docs-toc">
+              <div class="docs-toc-title">
+                <span>On this page</span>
+                <span>☰</span>
+              </div>
+              <a href="#doc-whatis" class="toc-link active">What is NetGhost?</a>
+              <a href="#doc-architecture" class="toc-link">System Architecture</a>
+              <a href="#doc-methods" class="toc-link">IP-ID Header Embedding</a>
+              <a href="#doc-methods" class="toc-link">Temporal IPD</a>
+              <a href="#doc-security" class="toc-link">AES-256-GCM</a>
+              <a href="#doc-baseline" class="toc-link">Traffic Baseline Modeling</a>
+              <a href="#doc-gmm" class="toc-link">GMM Timing Profile</a>
+              <a href="#doc-framing" class="toc-link">Packet Framing</a>
+              <a href="#doc-decoding" class="toc-link">Receiver Decoding</a>
+              <a href="#doc-workflow" class="toc-link">Experiment Workflow</a>
+              <a href="#doc-future" class="toc-link">Limitations & Future Work</a>
+            </div>
+
+            <div class="docs-content">
+              <div id="doc-whatis" class="docs-section card">
+                <h3 style="font-size: 1.2rem; color: #fff; margin-bottom: 8px;">What is NetGhost? 🔗</h3>
+                <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 14px;">
+                  NetGhost is a controlled laboratory project demonstrating how framed encrypted data can be represented through selected packet fields or timing behavior in IPv4 network traffic.
+                </p>
+                <div class="notice-banner info" style="margin: 0;">
+                  <span>ⓘ</span>
+                  <span>This interface is intended for controlled academic experimentation and measurement.</span>
+                </div>
+              </div>
+
+              <div id="doc-architecture" class="docs-section card">
+                <h3 style="font-size: 1.2rem; color: #fff; margin-bottom: 8px;">System Architecture 🔗</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 18px;">
+                  Logical flow of the NetGhost laboratory pipeline from sender to receiver reconstruction.
+                </p>
+
+                <div class="arch-diagram-box">
+                  <div class="diagram-row">
+                    <div class="diagram-node primary">Sender Dashboard</div>
+                    <span class="diagram-arrow">→</span>
+                    <div class="diagram-node">AES-256-GCM</div>
+                    <span class="diagram-arrow">→</span>
+                    <div class="diagram-node">Framing</div>
+                    <span class="diagram-arrow">→</span>
+                    <div class="diagram-node">Channel Selection</div>
+                  </div>
+
+                  <div class="diagram-row" style="gap: 40px;">
+                    <div class="diagram-node" style="border-color:#3b82f6; color:#93c5fd;">IP-ID Header</div>
+                    <div class="diagram-node" style="border-color:#06b6d4; color:#67e8f9;">Temporal IPD</div>
+                  </div>
+
+                  <div class="diagram-row">
+                    <div class="diagram-node">ICMP Traffic</div>
+                    <span class="diagram-arrow">→</span>
+                    <div class="diagram-node">Receiver</div>
+                    <span class="diagram-arrow">→</span>
+                    <div class="diagram-node">Reassembly</div>
+                    <span class="diagram-arrow">→</span>
+                    <div class="diagram-node">Decrypt</div>
+                    <span class="diagram-arrow">→</span>
+                    <div class="diagram-node success">Plaintext</div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="doc-methods" class="docs-section">
+                <h3 style="font-size: 1.15rem; color: #fff; margin-bottom: 12px;">Methods 🔗</h3>
+                <div class="card" style="margin-bottom: 12px;">
+                  <h4 style="font-size: 0.95rem; color: #60a5fa; margin-bottom: 6px; font-family: var(--font-mono);">IP-ID Header Embedding</h4>
+                  <p style="font-size: 0.84rem; color: var(--text-secondary);">Embeds framed data into the IPv4 Identification field for controlled packet-level experiments.</p>
+                </div>
+                <div class="card">
+                  <h4 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 6px; font-family: var(--font-mono);">Temporal IPD</h4>
+                  <p style="font-size: 0.84rem; color: var(--text-secondary);">Encodes bits using controlled packet inter-arrival timing and measured traffic profiles.</p>
+                </div>
+              </div>
+
+              <div id="doc-security" class="docs-section card">
+                <h3 style="font-size: 1.15rem; color: #fff; margin-bottom: 8px;">Security Boundary 🔗</h3>
+                <div style="background-color: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px; display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-family: var(--font-mono); font-size: 0.88rem; color: #60a5fa;">
+                  <span>🔒</span> AES-256-GCM
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 8px;">
+                  AES-256-GCM provides authenticated encryption for the experimental payload and supports verification during receiver decoding.
+                </p>
+                <p style="font-size: 0.78rem; color: var(--text-muted);">
+                  This interface does not claim real-world firewall or DPI bypass.
+                </p>
+              </div>
+
+              <div id="doc-workflow" class="docs-section card">
+                <h3 style="font-size: 1.15rem; color: #fff; margin-bottom: 14px;">Experiment Workflow 🔗</h3>
+                <div class="step-sequence">
+                  <div class="step-circle">1</div>
+                  <div class="step-circle">2</div>
+                  <div class="step-circle">3</div>
+                  <div class="step-circle">4</div>
+                  <div class="step-circle">5</div>
+                  <div class="step-circle">6</div>
+                  <div class="step-circle">7</div>
+                  <div class="step-circle">8</div>
+                </div>
+              </div>
+
+              <div id="doc-baseline" class="card">
+                <h4 style="font-size: 1rem; color: #fff; margin-bottom: 6px;">Traffic Baseline Modeling</h4>
+                <p style="font-size: 0.84rem; color: var(--text-secondary);">Baseline packet timing is measured from laboratory traffic to establish reference behavior for controlled comparisons.</p>
+              </div>
+
+              <div id="doc-gmm" class="card">
+                <h4 style="font-size: 1rem; color: #fff; margin-bottom: 6px;">GMM Timing Profile</h4>
+                <p style="font-size: 0.84rem; color: var(--text-secondary);">A Gaussian Mixture Model represents multiple timing components and produces a configurable statistical profile.</p>
+              </div>
+
+              <div id="doc-framing" class="card">
+                <h4 style="font-size: 1rem; color: #fff; margin-bottom: 6px;">Packet Framing</h4>
+                <p style="font-size: 0.84rem; color: var(--text-secondary);">Encrypted payloads are organized into identifiable fragments so the receiver can validate ordering and reconstruct the message.</p>
+              </div>
+
+              <div id="doc-decoding" class="card">
+                <h4 style="font-size: 1rem; color: #fff; margin-bottom: 6px;">Receiver Decoding</h4>
+                <p style="font-size: 0.84rem; color: var(--text-secondary);">The receiver captures traffic, identifies framed data, reassembles fragments, authenticates the ciphertext and decrypts the result.</p>
+              </div>
+
+              <div id="doc-future" class="card">
+                <h4 style="font-size: 1rem; color: #fff; margin-bottom: 6px;">Future Work</h4>
+                <p style="font-size: 0.84rem; color: var(--text-secondary);">Future experimentation may evaluate additional laboratory channels, timing models and measurement techniques while preserving the controlled-environment boundary.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- =================================================================
+             SCREEN 9: SETTINGS
+             ================================================================= -->
+        <section id="view-settings" class="page-view">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                Settings
+              </h2>
+              <p class="page-desc">Configure local preferences for the NetGhost laboratory console.</p>
+            </div>
+          </div>
+
+          <!-- Appearance -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Appearance</h3>
+                <p>Adjust the console display and interaction preferences.</p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Theme</label>
+              <div class="grid-2">
+                <label style="display: flex; align-items: center; gap: 8px; background: #0e1017; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: var(--radius-sm); cursor: pointer;">
+                  <input type="radio" name="theme-choice" value="dark" checked>
+                  <span style="color: #fff; font-size: 0.88rem;">Dark mode</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; background: #0e1017; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: var(--radius-sm); cursor: pointer;">
+                  <input type="radio" name="theme-choice" value="light">
+                  <span style="color: #fff; font-size: 0.88rem;">Light mode</span>
+                </label>
+              </div>
+            </div>
+
+            <div style="background: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div>
+                <div style="color: #fff; font-size: 0.88rem; font-weight: 600;">Reduce motion</div>
+                <div style="color: var(--text-muted); font-size: 0.76rem;">Minimize nonessential interface transitions.</div>
+              </div>
+              <input type="checkbox" id="reduceMotionToggle" style="cursor: pointer;">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Accent color</label>
+              <select class="form-select" style="max-width: 240px;">
+                <option selected>Cyan</option>
+                <option>Electric Blue</option>
+                <option>Emerald Green</option>
+                <option>Purple</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Network -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Network</h3>
+                <p>Set local capture and transmission defaults.</p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Default target</label>
+              <input type="text" class="form-input cell-mono" value="127.0.0.1">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Capture Interface</label>
+              <select class="form-select">
+                <option selected>lo0 — Loopback</option>
+                <option>eth0</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Security -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Security</h3>
+                <p>Control session handling for sensitive laboratory values.</p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Session timeout</label>
+              <select class="form-select" style="max-width: 240px;">
+                <option selected>30 minutes</option>
+                <option>1 hour</option>
+                <option>Never</option>
+              </select>
+            </div>
+
+            <div style="background: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <div>
+                <div style="color: #fff; font-size: 0.88rem; font-weight: 600;">Secret visibility</div>
+                <div style="color: var(--text-muted); font-size: 0.76rem;">Require confirmation</div>
+              </div>
+              <input type="checkbox" checked style="cursor: pointer;">
+            </div>
+
+            <div style="font-size: 0.74rem; color: var(--text-muted);">
+              Secrets are session-scoped.
+            </div>
+          </div>
+
+          <!-- Experiment Defaults -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>Experiment</h3>
+                <p>Choose defaults for new controlled experiments.</p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Default channel</label>
+              <select class="form-select">
+                <option selected>IP-ID Header Embedding</option>
+                <option>Temporal IPD</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Default timing profile</label>
+              <select class="form-select">
+                <option selected>Normal / Variable Load</option>
+                <option>Constant</option>
+                <option>GMM</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Packet protocol</label>
+              <input type="text" class="form-input cell-mono" value="IPv4 / ICMP" readonly>
+            </div>
+          </div>
+
+          <!-- Danger Zone -->
+          <div class="card" style="border-color: rgba(239, 68, 68, 0.3);">
+            <div class="card-header">
+              <div>
+                <h3 style="color: #ef4444; font-size: 1.05rem;">Danger zone</h3>
+                <p style="color: var(--text-muted); font-size: 0.82rem;">Clear local experiment history</p>
+              </div>
+              <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 6px 12px;">Clear history</button>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
+              <span style="font-size: 0.82rem; color: var(--text-muted);">This removes locally stored experiment records.</span>
+              <button class="btn btn-danger" id="btnClearHistory">Confirm and clear</button>
+            </div>
+          </div>
+
+          <!-- Bottom Save Actions -->
+          <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+            <button class="btn btn-secondary" id="btnResetSettings">Reset to Defaults</button>
+            <button class="btn btn-primary" id="btnSaveSettings">Save Changes</button>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/static/js/netghost.js"></script>
+</body>
+</html>

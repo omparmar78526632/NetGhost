@@ -1,0 +1,11 @@
+{
+  "theme": "dark",
+  "reduce_motion": false,
+  "accent_color": "cyan",
+  "default_target": "127.0.0.1",
+  "capture_interface": "all",
+  "session_timeout": 30,
+  "secret_visibility": false,
+  "default_channel": "header",
+  "default_timing_profile": "normal"
+}
