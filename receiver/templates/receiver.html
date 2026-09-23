@@ -469,6 +469,140 @@
             </div>
           </div>
 
+          <!-- Real-Time Transmission Visualization -->
+          <div class="card live-flow-card" id="senderFlowCard">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  LIVE TRANSMISSION FLOW
+                </h3>
+                <p>Visual representation of the current data transmission</p>
+              </div>
+              <span class="badge-tag idle" id="flowTxStatusBadge">IDLE</span>
+            </div>
+
+            <!-- Pipeline Visual Nodes -->
+            <div class="flow-pipeline-container">
+              <div class="flow-stage-node" id="txNodeSender" data-stage="sender">
+                <div class="flow-node-icon">🖥️</div>
+                <div class="flow-node-title">SENDER</div>
+                <div class="flow-node-subtitle">Dashboard</div>
+                <div class="flow-node-badge">IDLE</div>
+              </div>
+
+              <div class="flow-pipeline-link">
+                <div class="flow-link-label">Encrypt</div>
+                <div class="flow-link-line"><span class="flow-link-particle"></span></div>
+              </div>
+
+              <div class="flow-stage-node" id="txNodeCrypto" data-stage="crypto">
+                <div class="flow-node-icon">🔒</div>
+                <div class="flow-node-title">AES-256-GCM</div>
+                <div class="flow-node-subtitle">Authenticated</div>
+                <div class="flow-node-badge">IDLE</div>
+              </div>
+
+              <div class="flow-pipeline-link">
+                <div class="flow-link-label">Frame</div>
+                <div class="flow-link-line"><span class="flow-link-particle"></span></div>
+              </div>
+
+              <div class="flow-stage-node" id="txNodeFragmenter" data-stage="fragmenter">
+                <div class="flow-node-icon">🧩</div>
+                <div class="flow-node-title">Fragmenter</div>
+                <div class="flow-node-subtitle">16-bit / Bitstream</div>
+                <div class="flow-node-badge">IDLE</div>
+              </div>
+
+              <div class="flow-pipeline-link">
+                <div class="flow-link-label">Transmit</div>
+                <div class="flow-link-line"><span class="flow-link-particle"></span></div>
+              </div>
+
+              <div class="flow-stage-node" id="txNodePackets" data-stage="packets">
+                <div class="flow-node-icon">📦</div>
+                <div class="flow-node-title">PACKET FLOW</div>
+                <div class="flow-node-subtitle">Live Stream</div>
+                <div class="flow-node-badge" id="txBadgePackets">0 / 0</div>
+              </div>
+
+              <div class="flow-pipeline-link">
+                <div class="flow-link-label">Network</div>
+                <div class="flow-link-line"><span class="flow-link-particle"></span></div>
+              </div>
+
+              <div class="flow-stage-node" id="txNodeChannel" data-stage="channel">
+                <div class="flow-node-icon">🌐</div>
+                <div class="flow-node-title">ICMP / IPv4</div>
+                <div class="flow-node-subtitle">Channel Egress</div>
+                <div class="flow-node-badge">IDLE</div>
+              </div>
+            </div>
+
+            <!-- Flow Telemetry Metrics Grid -->
+            <div class="flow-metrics-grid">
+              <div class="flow-metric-item">
+                <span class="flow-metric-label">Channel</span>
+                <span class="flow-metric-value" id="flowTxChannel">IP-ID Header Embedding</span>
+              </div>
+              <div class="flow-metric-item">
+                <span class="flow-metric-label">Packets</span>
+                <span class="flow-metric-value cell-mono" id="flowTxPackets">0 / 0</span>
+              </div>
+              <div class="flow-metric-item">
+                <span class="flow-metric-label">Payload</span>
+                <span class="flow-metric-value cell-mono" id="flowTxPayload">0 bytes</span>
+              </div>
+              <div class="flow-metric-item">
+                <span class="flow-metric-label">Status</span>
+                <span class="flow-metric-value flow-status-text" id="flowTxStatus">IDLE</span>
+              </div>
+              <div class="flow-metric-item">
+                <span class="flow-metric-label">Transmission Time</span>
+                <span class="flow-metric-value cell-mono" id="flowTxTime">0.00 s</span>
+              </div>
+              <div class="flow-metric-item">
+                <span class="flow-metric-label">Timing Profile</span>
+                <span class="flow-metric-value" id="flowTxProfile">Direct</span>
+              </div>
+            </div>
+
+            <!-- Dynamic Mode Visualizer (IP-ID vs Temporal) -->
+            <div class="flow-dynamic-display">
+              <!-- IP-ID Packet Stream View -->
+              <div id="flowIpidSection" class="flow-mode-panel active">
+                <div class="flow-sub-header">
+                  <span class="flow-sub-title">REAL-TIME IP-ID PACKET CONVEYOR</span>
+                  <span class="cell-mono flow-sub-stat">Current IP ID: <strong id="flowTxCurrentIpid" style="color:#60a5fa;">0x0000</strong></span>
+                </div>
+                <div class="flow-packet-stream" id="flowTxPacketConveyor">
+                  <div class="flow-empty-state">Ready for transmission. Packets will travel left-to-right in real time.</div>
+                </div>
+              </div>
+
+              <!-- Temporal IPD Timeline View -->
+              <div id="flowTemporalSection" class="flow-mode-panel" style="display: none;">
+                <div class="flow-sub-header">
+                  <span class="flow-sub-title">TEMPORAL IPD RELATIVE TIMING TIMELINE</span>
+                  <div class="flow-temporal-quickstats">
+                    <span>Current IPD: <strong id="flowTxCurrentIpd" class="cell-mono" style="color:#34d399;">—</strong></span>
+                    <span>Sampled Delay: <strong id="flowTxSampledDelay" class="cell-mono" style="color:#a78bfa;">—</strong></span>
+                  </div>
+                </div>
+                <div class="flow-timeline-track" id="flowTxTimeline">
+                  <div class="flow-empty-state">Ready for temporal transmission. Relative delay pulses will appear along timeline.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Diagnostic / Failure Alert Banner -->
+            <div class="notice-banner error" id="flowTxFailureBanner" style="display: none;">
+              <span>⚠</span>
+              <span id="flowTxFailureText">TRANSMISSION FAILED</span>
+            </div>
+          </div>
+
           <div class="notice-banner info">
             <span>ⓘ</span>
             <span>AES-256-GCM is represented here as a UI workflow stage. Full cryptographic verification is active.</span>
@@ -636,6 +770,159 @@
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                 Export Result
               </button>
+            </div>
+          </div>
+
+          <!-- Real-Time Reception Visualization -->
+          <div class="card live-flow-card" id="receiverFlowCard">
+            <div class="card-header">
+              <div class="card-title-group">
+                <h3>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+                  LIVE RECEPTION FLOW
+                </h3>
+                <p>Real-time visualization of captured and decoded traffic</p>
+              </div>
+              <span class="badge-tag idle" id="flowRxStatusBadge">RECEIVER READY</span>
+            </div>
+
+            <!-- Receiver Pipeline Visual Nodes -->
+            <div class="flow-pipeline-container rx-pipeline">
+              <div class="flow-stage-node" id="rxNodeNetwork" data-stage="network">
+                <div class="flow-node-icon">🌐</div>
+                <div class="flow-node-title">NETWORK</div>
+                <div class="flow-node-subtitle">Traffic Ingress</div>
+                <div class="flow-node-badge">READY</div>
+              </div>
+
+              <div class="flow-pipeline-link">
+                <div class="flow-link-label">Sniff</div>
+                <div class="flow-link-line"><span class="flow-link-particle"></span></div>
+              </div>
+
+              <div class="flow-stage-node" id="rxNodeCapture" data-stage="capture">
+                <div class="flow-node-icon">📡</div>
+                <div class="flow-node-title">PACKET CAPTURE</div>
+                <div class="flow-node-subtitle">Scapy Ingress</div>
+                <div class="flow-node-badge" id="rxBadgeCapture">0 pkts</div>
+              </div>
+
+              <div class="flow-pipeline-link">
+                <div class="flow-link-label">Sync</div>
+                <div class="flow-link-line"><span class="flow-link-particle"></span></div>
+              </div>
+
+              <div class="flow-stage-node" id="rxNodeSync" data-stage="sync">
+                <div class="flow-node-icon">⚡</div>
+                <div class="flow-node-title">SYNCHRONIZATION</div>
+                <div class="flow-node-subtitle">0xDEAD Marker</div>
+                <div class="flow-node-badge" id="rxBadgeSync">WAITING</div>
+              </div>
+
+              <div class="flow-pipeline-link">
+                <div class="flow-link-label">Extract</div>
+                <div class="flow-link-line"><span class="flow-link-particle"></span></div>
+              </div>
+
+              <div class="flow-stage-node" id="rxNodeExtraction" data-stage="extraction">
+                <div class="flow-node-icon">🔍</div>
+                <div class="flow-node-title">FRAME EXTRACTION</div>
+                <div class="flow-node-subtitle">Lengths & Chunks</div>
+                <div class="flow-node-badge" id="rxBadgeExtraction">WAITING</div>
+              </div>
+
+              <div class="flow-pipeline-link">
+                <div class="flow-link-label">Assemble</div>
+                <div class="flow-link-line"><span class="flow-link-particle"></span></div>
+              </div>
+
+              <div class="flow-stage-node" id="rxNodeReassembly" data-stage="reassembly">
+                <div class="flow-node-icon">🧩</div>
+                <div class="flow-node-title">REASSEMBLY</div>
+                <div class="flow-node-subtitle">Fragment Buffer</div>
+                <div class="flow-node-badge" id="rxBadgeReassembly">0%</div>
+              </div>
+
+              <div class="flow-pipeline-link">
+                <div class="flow-link-label">Decrypt</div>
+                <div class="flow-link-line"><span class="flow-link-particle"></span></div>
+              </div>
+
+              <div class="flow-stage-node" id="rxNodeCrypto" data-stage="crypto">
+                <div class="flow-node-icon">🔓</div>
+                <div class="flow-node-title">AES-256-GCM</div>
+                <div class="flow-node-subtitle">Auth & Decrypt</div>
+                <div class="flow-node-badge" id="rxBadgeCrypto">WAITING</div>
+              </div>
+
+              <div class="flow-pipeline-link">
+                <div class="flow-link-label">Recover</div>
+                <div class="flow-link-line"><span class="flow-link-particle"></span></div>
+              </div>
+
+              <div class="flow-stage-node" id="rxNodeMessage" data-stage="message">
+                <div class="flow-node-icon">📄</div>
+                <div class="flow-node-title">RECOVERED MESSAGE</div>
+                <div class="flow-node-subtitle">Plaintext Verified</div>
+                <div class="flow-node-badge" id="rxBadgeMessage">WAITING</div>
+              </div>
+            </div>
+
+            <!-- Receiver Diagnostic Counters -->
+            <div class="flow-metrics-grid rx-grid">
+              <div class="flow-metric-item">
+                <span class="flow-metric-label">PACKETS RECEIVED</span>
+                <span class="flow-metric-value cell-mono" id="flowRxPacketsReceived">0</span>
+              </div>
+              <div class="flow-metric-item">
+                <span class="flow-metric-label">FRAGMENTS DECODED</span>
+                <span class="flow-metric-value cell-mono" id="flowRxFragmentsDecoded">0 / 0</span>
+              </div>
+              <div class="flow-metric-item">
+                <span class="flow-metric-label">REASSEMBLY</span>
+                <span class="flow-metric-value cell-mono" id="flowRxReassemblyPct">0%</span>
+              </div>
+              <div class="flow-metric-item">
+                <span class="flow-metric-label">AUTHENTICATION</span>
+                <span class="flow-metric-value flow-status-text" id="flowRxAuthStatus">WAITING</span>
+              </div>
+              <div class="flow-metric-item">
+                <span class="flow-metric-label">DECRYPTION</span>
+                <span class="flow-metric-value flow-status-text" id="flowRxDecryptStatus">WAITING</span>
+              </div>
+              <div class="flow-metric-item">
+                <span class="flow-metric-label">MESSAGE</span>
+                <span class="flow-metric-value flow-status-text" id="flowRxMessageState">WAITING</span>
+              </div>
+            </div>
+
+            <!-- Live Ingress Packet Stream -->
+            <div class="flow-dynamic-display">
+              <div class="flow-sub-header">
+                <span class="flow-sub-title">REAL-TIME INGRESS PACKET CAPTURE STREAM</span>
+                <span class="cell-mono flow-sub-stat" id="flowRxActiveChannelInfo">Channel: Awaiting Capture</span>
+              </div>
+              <div class="flow-packet-stream rx-stream" id="flowRxPacketConveyor">
+                <div class="flow-empty-state">Receiver Ready. Waiting for traffic... Click "Start Capture" to begin.</div>
+              </div>
+            </div>
+
+            <!-- Plaintext Terminal Decryption Reveal Effect -->
+            <div class="flow-terminal-box" id="flowRxTerminalBox">
+              <div class="flow-terminal-bar">
+                <div class="flow-terminal-dots"><span></span><span></span><span></span></div>
+                <span class="flow-terminal-title">RECOVERED PLAINTEXT SECURE TERMINAL</span>
+                <span class="badge-tag idle" id="flowTerminalTag">AWAITING</span>
+              </div>
+              <div class="flow-terminal-body" id="flowRxTerminalText">
+                <span class="flow-cursor">&gt; </span><span class="terminal-placeholder">Awaiting authentic decrypted payload...</span>
+              </div>
+            </div>
+
+            <!-- Diagnostic Error / Bottleneck Banner -->
+            <div class="notice-banner error" id="flowRxDiagnosticBanner" style="display: none;">
+              <span>⚠</span>
+              <span id="flowRxDiagnosticText">NO PACKETS RECEIVED</span>
             </div>
           </div>
 

@@ -186,6 +186,660 @@ function initOverview() {
 }
 
 /* ==========================================================================
+   4.1 REAL-TIME TRANSMISSION FLOW CONTROLLER (Sender Visualization)
+   ========================================================================== */
+const TransmissionFlow = {
+  state: 'IDLE',
+  channel: 'IP-ID Header Embedding',
+  mode: 'header',
+  timingProfile: 'Direct',
+  packetsSent: 0,
+  totalPackets: 0,
+  payloadBytes: 0,
+  startTime: null,
+  timerInterval: null,
+  conveyorEl: null,
+  timelineEl: null,
+  maxConveyorItems: 10,
+
+  init() {
+    this.conveyorEl = document.getElementById('flowTxPacketConveyor');
+    this.timelineEl = document.getElementById('flowTxTimeline');
+    this.bindControls();
+    this.reset();
+  },
+
+  bindControls() {
+    const modeSelect = document.getElementById('senderMode');
+    const timingSelect = document.getElementById('senderTimingProfile');
+
+    if (modeSelect) {
+      modeSelect.addEventListener('change', () => {
+        this.setMode(modeSelect.value);
+      });
+    }
+
+    if (timingSelect) {
+      timingSelect.addEventListener('change', () => {
+        if (this.mode === 'temporal') {
+          const profLabel = timingSelect.options[timingSelect.selectedIndex]?.text || timingSelect.value;
+          this.setTimingProfile(profLabel);
+        }
+      });
+    }
+  },
+
+  setMode(mode) {
+    this.mode = mode;
+    this.channel = mode === 'header' ? 'IP-ID Header Embedding' : 'Temporal IPD';
+    
+    const chanEl = document.getElementById('flowTxChannel');
+    if (chanEl) chanEl.textContent = this.channel;
+
+    const ipidSec = document.getElementById('flowIpidSection');
+    const temporalSec = document.getElementById('flowTemporalSection');
+
+    if (mode === 'header') {
+      if (ipidSec) ipidSec.style.display = 'block';
+      if (temporalSec) temporalSec.style.display = 'none';
+      this.setTimingProfile('Direct');
+    } else {
+      if (ipidSec) ipidSec.style.display = 'none';
+      if (temporalSec) temporalSec.style.display = 'block';
+      const timingSelect = document.getElementById('senderTimingProfile');
+      const profLabel = timingSelect?.options[timingSelect.selectedIndex]?.text || 'Normal / Variable Load';
+      this.setTimingProfile(profLabel);
+    }
+  },
+
+  setTimingProfile(profile) {
+    this.timingProfile = profile;
+    const profEl = document.getElementById('flowTxProfile');
+    if (profEl) profEl.textContent = profile;
+  },
+
+  setTxState(status, badgeText) {
+    this.state = status;
+    const badge = document.getElementById('flowTxStatusBadge');
+    const statusText = document.getElementById('flowTxStatus');
+    const pipeline = document.querySelector('#senderFlowCard .flow-pipeline-container');
+
+    const label = badgeText || status;
+    if (badge) {
+      badge.textContent = label;
+      badge.className = `badge-tag ${status.toLowerCase()}`;
+    }
+    if (statusText) {
+      statusText.textContent = label;
+      statusText.className = `flow-metric-value flow-status-text ${status.toLowerCase()}`;
+    }
+
+    if (pipeline) {
+      if (status === 'TRANSMITTING') {
+        pipeline.classList.add('transmitting');
+      } else {
+        pipeline.classList.remove('transmitting');
+      }
+    }
+  },
+
+  setNodeState(nodeId, stateClass, badgeText) {
+    const node = document.getElementById(nodeId);
+    if (!node) return;
+    node.classList.remove('active', 'success', 'error');
+    if (stateClass) node.classList.add(stateClass);
+    const badge = node.querySelector('.flow-node-badge');
+    if (badge && badgeText !== undefined) {
+      badge.textContent = badgeText;
+    }
+  },
+
+  reset() {
+    this.setTxState('IDLE');
+    this.packetsSent = 0;
+    this.totalPackets = 0;
+    this.payloadBytes = 0;
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    this.timerInterval = null;
+
+    const timeEl = document.getElementById('flowTxTime');
+    if (timeEl) timeEl.textContent = '0.00 s';
+
+    const pktsEl = document.getElementById('flowTxPackets');
+    if (pktsEl) pktsEl.textContent = '0 / 0';
+
+    const payloadEl = document.getElementById('flowTxPayload');
+    if (payloadEl) payloadEl.textContent = '0 bytes';
+
+    const ipidEl = document.getElementById('flowTxCurrentIpid');
+    if (ipidEl) ipidEl.textContent = '0x0000';
+
+    const ipdEl = document.getElementById('flowTxCurrentIpd');
+    if (ipdEl) ipdEl.textContent = '—';
+
+    const sampleEl = document.getElementById('flowTxSampledDelay');
+    if (sampleEl) sampleEl.textContent = '—';
+
+    const banner = document.getElementById('flowTxFailureBanner');
+    if (banner) banner.style.display = 'none';
+
+    this.setNodeState('txNodeSender', '', 'IDLE');
+    this.setNodeState('txNodeCrypto', '', 'IDLE');
+    this.setNodeState('txNodeFragmenter', '', 'IDLE');
+    this.setNodeState('txNodePackets', '', '0 / 0');
+    this.setNodeState('txNodeChannel', '', 'IDLE');
+
+    if (this.conveyorEl) {
+      this.conveyorEl.innerHTML = '<div class="flow-empty-state">Ready for transmission. Packets will travel left-to-right in real time.</div>';
+    }
+    if (this.timelineEl) {
+      this.timelineEl.innerHTML = '<div class="flow-empty-state">Ready for temporal transmission. Relative delay pulses will appear along timeline.</div>';
+    }
+  },
+
+  onPrepared(data) {
+    this.setTxState('READY');
+    this.totalPackets = data.fragment_count;
+    this.payloadBytes = data.frame_size_bytes;
+
+    const payloadEl = document.getElementById('flowTxPayload');
+    if (payloadEl) payloadEl.textContent = `${data.frame_size_bytes} bytes`;
+
+    const pktsEl = document.getElementById('flowTxPackets');
+    if (pktsEl) pktsEl.textContent = `0 / ${data.fragment_count}`;
+
+    this.setNodeState('txNodeSender', 'active', 'READY');
+    this.setNodeState('txNodeCrypto', 'success', 'AES-GCM');
+    this.setNodeState('txNodeFragmenter', 'active', `${data.fragment_count} frags`);
+    this.setNodeState('txNodePackets', '', `0 / ${data.fragment_count}`);
+    this.setNodeState('txNodeChannel', '', 'READY');
+
+    if (data.preview_fragments && data.preview_fragments[0]) {
+      const ipidEl = document.getElementById('flowTxCurrentIpid');
+      if (ipidEl) ipidEl.textContent = data.preview_fragments[0].hex;
+    }
+  },
+
+  startTimer() {
+    this.startTime = Date.now();
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    const timeEl = document.getElementById('flowTxTime');
+    this.timerInterval = setInterval(() => {
+      if (this.startTime && timeEl) {
+        const elapsed = (Date.now() - this.startTime) / 1000;
+        timeEl.textContent = `${elapsed.toFixed(2)} s`;
+      }
+    }, 50);
+  },
+
+  stopTimer(finalSeconds) {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    this.timerInterval = null;
+    const timeEl = document.getElementById('flowTxTime');
+    if (timeEl && finalSeconds !== undefined) {
+      timeEl.textContent = `${finalSeconds.toFixed(2)} s`;
+    }
+  },
+
+  handleEvent(event) {
+    if (!event || !event.type) return;
+
+    if (event.type === 'tx_started') {
+      this.reset();
+      this.totalPackets = event.total_packets;
+      this.payloadBytes = event.frame_size || event.payload_size || 0;
+      this.setMode(event.mode || 'header');
+      if (event.timing_profile) this.setTimingProfile(event.timing_profile);
+      this.setTxState('TRANSMITTING');
+      this.startTimer();
+
+      const payloadEl = document.getElementById('flowTxPayload');
+      if (payloadEl) payloadEl.textContent = `${this.payloadBytes} bytes`;
+
+      const pktsEl = document.getElementById('flowTxPackets');
+      if (pktsEl) pktsEl.textContent = `0 / ${this.totalPackets}`;
+
+      this.setNodeState('txNodeSender', 'success', 'ACTIVE');
+      this.setNodeState('txNodeCrypto', 'success', 'ENCRYPTED');
+      this.setNodeState('txNodeFragmenter', 'success', `${this.totalPackets} PKTS`);
+      this.setNodeState('txNodePackets', 'active', `0 / ${this.totalPackets}`);
+      this.setNodeState('txNodeChannel', 'active', 'EGRESS');
+
+      if (this.conveyorEl) this.conveyorEl.innerHTML = '';
+      if (this.timelineEl) this.timelineEl.innerHTML = '';
+    }
+    else if (event.type === 'tx_packet') {
+      this.packetsSent = event.index;
+      const total = event.total || this.totalPackets || event.index;
+
+      const pktsEl = document.getElementById('flowTxPackets');
+      if (pktsEl) pktsEl.textContent = `${event.index} / ${total}`;
+
+      this.setNodeState('txNodePackets', 'active', `${event.index} / ${total}`);
+
+      if (this.mode === 'header' || event.channel?.includes('IP-ID')) {
+        const ipidEl = document.getElementById('flowTxCurrentIpid');
+        if (ipidEl) ipidEl.textContent = event.ip_id_hex;
+
+        if (this.conveyorEl) {
+          if (this.conveyorEl.querySelector('.flow-empty-state')) {
+            this.conveyorEl.innerHTML = '';
+          }
+          const card = document.createElement('div');
+          card.className = `ng-packet-card ${event.is_sync ? 'sync-packet' : ''}`;
+          card.innerHTML = `
+            <div class="ng-packet-card-header">
+              <span class="ng-packet-num">PKT #${String(event.index).padStart(2, '0')}</span>
+              <span class="ng-packet-proto">IPv4 / ICMP</span>
+            </div>
+            <div class="ng-packet-field-row">
+              <span class="ng-packet-field-key">IP.id</span>
+              <span class="ng-packet-field-val">${event.ip_id_hex}</span>
+            </div>
+            <div class="ng-packet-field-row">
+              <span class="ng-packet-field-key">Tag</span>
+              <span class="ng-packet-field-val" style="color:${event.is_sync ? '#f59e0b' : '#60a5fa'};">${event.is_sync ? 'SYNC (0xDEAD)' : 'DATA_CHUNK'}</span>
+            </div>
+          `;
+          this.conveyorEl.prepend(card);
+          if (this.conveyorEl.children.length > this.maxConveyorItems) {
+            this.conveyorEl.removeChild(this.conveyorEl.lastChild);
+          }
+        }
+      } else {
+        // Temporal IPD Mode
+        const delayVal = event.intended_delay_ms !== undefined ? event.intended_delay_ms : (event.actual_delay_ms || 0);
+        const ipdEl = document.getElementById('flowTxCurrentIpd');
+        if (ipdEl) ipdEl.textContent = `${delayVal} ms`;
+
+        const sampleEl = document.getElementById('flowTxSampledDelay');
+        if (sampleEl) sampleEl.textContent = `${delayVal} ms`;
+
+        if (this.timelineEl) {
+          if (this.timelineEl.querySelector('.flow-empty-state')) {
+            this.timelineEl.innerHTML = '';
+          }
+          const node = document.createElement('div');
+          node.className = 'flow-temporal-node';
+          if (event.bit === null || event.index === 1) {
+            node.innerHTML = `
+              <div class="flow-temporal-pkt" style="border-color:#f59e0b;">
+                <strong style="color:#f59e0b;">Pkt 01</strong>
+                <span>SYNC LEAD</span>
+              </div>
+            `;
+          } else {
+            node.innerHTML = `
+              <div class="flow-temporal-delay">Δt: ${delayVal}ms</div>
+              <div class="flow-temporal-pkt">
+                <strong>Pkt ${String(event.index).padStart(2, '0')}</strong>
+                <span class="flow-temporal-bit">Bit ${event.bit}</span>
+              </div>
+            `;
+          }
+          this.timelineEl.appendChild(node);
+          if (this.timelineEl.children.length > 12) {
+            this.timelineEl.removeChild(this.timelineEl.firstChild);
+          }
+          this.timelineEl.scrollLeft = this.timelineEl.scrollWidth;
+        }
+      }
+    }
+    else if (event.type === 'tx_completed') {
+      const stats = event.stats || {};
+      this.stopTimer(stats.duration_seconds);
+      this.setTxState('COMPLETED');
+
+      const pktsEl = document.getElementById('flowTxPackets');
+      if (pktsEl) pktsEl.textContent = `${stats.packets_sent} / ${stats.packets_sent}`;
+
+      this.setNodeState('txNodeSender', 'success', 'DONE');
+      this.setNodeState('txNodeCrypto', 'success', 'AUTH_TAG_OK');
+      this.setNodeState('txNodeFragmenter', 'success', '100% SENT');
+      this.setNodeState('txNodePackets', 'success', `${stats.packets_sent} PKTS`);
+      this.setNodeState('txNodeChannel', 'success', 'COMPLETED');
+    }
+    else if (event.type === 'tx_failed') {
+      this.stopTimer();
+      this.setTxState('FAILED');
+      this.setNodeState('txNodeSender', 'error', 'FAILED');
+      this.setNodeState('txNodeChannel', 'error', 'ABORTED');
+
+      const banner = document.getElementById('flowTxFailureBanner');
+      const text = document.getElementById('flowTxFailureText');
+      if (banner && text) {
+        text.textContent = `TRANSMISSION FAILED: ${event.error || 'Network error'}`;
+        banner.style.display = 'flex';
+      }
+    }
+  }
+};
+
+/* ==========================================================================
+   4.2 REAL-TIME RECEPTION FLOW CONTROLLER (Receiver Visualization)
+   ========================================================================== */
+const ReceptionFlow = {
+  state: 'IDLE',
+  packetsReceived: 0,
+  fragmentsDecoded: 0,
+  totalFragments: 0,
+  reassemblyPct: 0,
+  authStatus: 'WAITING',
+  decryptStatus: 'WAITING',
+  messageState: 'WAITING',
+  conveyorEl: null,
+  terminalEl: null,
+  maxConveyorItems: 10,
+  typewriterTimer: null,
+
+  init() {
+    this.conveyorEl = document.getElementById('flowRxPacketConveyor');
+    this.terminalEl = document.getElementById('flowRxTerminalText');
+    this.reset();
+  },
+
+  setRxState(status, badgeText) {
+    this.state = status;
+    const badge = document.getElementById('flowRxStatusBadge');
+    const pipeline = document.querySelector('#receiverFlowCard .flow-pipeline-container');
+
+    const label = badgeText || status;
+    if (badge) {
+      badge.textContent = label;
+      badge.className = `badge-tag ${status === 'CAPTURE ACTIVE' ? 'running' : (status === 'COMPLETED' ? 'success' : (status === 'ERROR' || status === 'FAILED' ? 'error' : 'idle'))}`;
+    }
+
+    if (pipeline) {
+      if (status === 'CAPTURE ACTIVE' || status === 'RECEIVING' || status === 'REASSEMBLING' || status === 'SYNCHRONIZING') {
+        pipeline.classList.add('receiving');
+      } else {
+        pipeline.classList.remove('receiving');
+      }
+    }
+  },
+
+  setNodeState(nodeId, stateClass, badgeText) {
+    const node = document.getElementById(nodeId);
+    if (!node) return;
+    node.classList.remove('active', 'success', 'error');
+    if (stateClass) node.classList.add(stateClass);
+    const badge = node.querySelector('.flow-node-badge');
+    if (badge && badgeText !== undefined) {
+      badge.textContent = badgeText;
+    }
+  },
+
+  reset() {
+    this.setRxState('RECEIVER READY', 'RECEIVER READY');
+    this.packetsReceived = 0;
+    this.fragmentsDecoded = 0;
+    this.totalFragments = 0;
+    this.reassemblyPct = 0;
+    this.authStatus = 'WAITING';
+    this.decryptStatus = 'WAITING';
+    this.messageState = 'WAITING';
+    if (this.typewriterTimer) clearInterval(this.typewriterTimer);
+
+    const pktsEl = document.getElementById('flowRxPacketsReceived');
+    if (pktsEl) pktsEl.textContent = '0';
+
+    const fragsEl = document.getElementById('flowRxFragmentsDecoded');
+    if (fragsEl) fragsEl.textContent = '0 / 0';
+
+    const reassemblyEl = document.getElementById('flowRxReassemblyPct');
+    if (reassemblyEl) reassemblyEl.textContent = '0%';
+
+    const authEl = document.getElementById('flowRxAuthStatus');
+    if (authEl) {
+      authEl.textContent = 'WAITING';
+      authEl.className = 'flow-metric-value flow-status-text';
+    }
+
+    const decryptEl = document.getElementById('flowRxDecryptStatus');
+    if (decryptEl) {
+      decryptEl.textContent = 'WAITING';
+      decryptEl.className = 'flow-metric-value flow-status-text';
+    }
+
+    const msgStateEl = document.getElementById('flowRxMessageState');
+    if (msgStateEl) {
+      msgStateEl.textContent = 'WAITING';
+      msgStateEl.className = 'flow-metric-value flow-status-text';
+    }
+
+    const banner = document.getElementById('flowRxDiagnosticBanner');
+    if (banner) banner.style.display = 'none';
+
+    const termTag = document.getElementById('flowTerminalTag');
+    if (termTag) {
+      termTag.textContent = 'AWAITING';
+      termTag.className = 'badge-tag idle';
+    }
+
+    if (this.terminalEl) {
+      this.terminalEl.className = 'flow-terminal-body';
+      this.terminalEl.innerHTML = '<span class="flow-cursor">&gt; </span><span class="terminal-placeholder">Awaiting authentic decrypted payload...</span>';
+    }
+
+    this.setNodeState('rxNodeNetwork', '', 'READY');
+    this.setNodeState('rxNodeCapture', '', '0 pkts');
+    this.setNodeState('rxNodeSync', '', 'WAITING');
+    this.setNodeState('rxNodeExtraction', '', 'WAITING');
+    this.setNodeState('rxNodeReassembly', '', '0%');
+    this.setNodeState('rxNodeCrypto', '', 'WAITING');
+    this.setNodeState('rxNodeMessage', '', 'WAITING');
+
+    if (this.conveyorEl) {
+      this.conveyorEl.innerHTML = '<div class="flow-empty-state">Receiver Ready. Waiting for traffic... Click "Start Capture" to begin.</div>';
+    }
+  },
+
+  handleEvent(event) {
+    if (!event || !event.type) return;
+
+    if (event.type === 'rx_started') {
+      this.reset();
+      this.setRxState('CAPTURE ACTIVE');
+      this.setNodeState('rxNodeNetwork', 'active', 'SNIFFING');
+      this.setNodeState('rxNodeCapture', 'active', 'ACTIVE');
+      const chanInfo = document.getElementById('flowRxActiveChannelInfo');
+      if (chanInfo) chanInfo.textContent = `Channel: ${event.channel || 'Auto-Detect (IP-ID / Temporal)'}`;
+      if (this.conveyorEl) {
+        this.conveyorEl.innerHTML = '<div class="flow-empty-state">Capture Active. Listening for incoming ICMP steganography packets...</div>';
+      }
+    }
+    else if (event.type === 'rx_packet') {
+      this.packetsReceived = event.index;
+      const pktsEl = document.getElementById('flowRxPacketsReceived');
+      if (pktsEl) pktsEl.textContent = `${event.index}`;
+
+      this.setNodeState('rxNodeNetwork', 'success', 'INGRESS');
+      this.setNodeState('rxNodeCapture', 'active', `${event.index} pkts`);
+
+      if (this.conveyorEl) {
+        if (this.conveyorEl.querySelector('.flow-empty-state')) {
+          this.conveyorEl.innerHTML = '';
+        }
+        const card = document.createElement('div');
+        card.className = `ng-packet-card rx-packet ${event.is_sync ? 'sync-packet' : ''}`;
+        card.innerHTML = `
+          <div class="ng-packet-card-header">
+            <span class="ng-packet-num">PKT #${String(event.index).padStart(2, '0')}</span>
+            <span class="ng-packet-proto">ICMP Echo</span>
+          </div>
+          <div class="ng-packet-field-row">
+            <span class="ng-packet-field-key">IP.id</span>
+            <span class="ng-packet-field-val">${event.ip_id_hex}</span>
+          </div>
+          <div class="ng-packet-field-row">
+            <span class="ng-packet-field-key">Δt / Bit</span>
+            <span class="ng-packet-field-val">${event.delay_ms} ms ${event.bit !== null && event.bit !== undefined ? ' | bit ' + event.bit : ''}</span>
+          </div>
+        `;
+        this.conveyorEl.prepend(card);
+        if (this.conveyorEl.children.length > this.maxConveyorItems) {
+          this.conveyorEl.removeChild(this.conveyorEl.lastChild);
+        }
+      }
+
+      // Diagnostic check: if packets arrive but no sync after 20 packets
+      if (this.packetsReceived >= 20 && this.state !== 'COMPLETED' && !document.getElementById('rxNodeSync')?.classList.contains('success')) {
+        const banner = document.getElementById('flowRxDiagnosticBanner');
+        const text = document.getElementById('flowRxDiagnosticText');
+        if (banner && text) {
+          text.textContent = `PACKETS ARE ARRIVING BUT SYNCHRONIZATION FAILED (Awaiting 0xDEAD sync marker)`;
+          banner.style.display = 'flex';
+        }
+      }
+    }
+    else if (event.type === 'rx_sync_detected') {
+      this.setRxState('SYNCHRONIZING');
+      this.setNodeState('rxNodeSync', 'success', '✓ 0xDEAD');
+      this.setNodeState('rxNodeExtraction', 'active', 'EXTRACTING');
+      const banner = document.getElementById('flowRxDiagnosticBanner');
+      if (banner) banner.style.display = 'none';
+    }
+    else if (event.type === 'rx_fragment') {
+      this.fragmentsDecoded = event.index;
+      this.totalFragments = event.total;
+      this.reassemblyPct = event.progress_pct;
+
+      const fragsEl = document.getElementById('flowRxFragmentsDecoded');
+      if (fragsEl) fragsEl.textContent = `${event.index} / ${event.total}`;
+
+      const reassemblyEl = document.getElementById('flowRxReassemblyPct');
+      if (reassemblyEl) reassemblyEl.textContent = `${event.progress_pct}%`;
+
+      this.setNodeState('rxNodeExtraction', 'active', `${event.index}/${event.total}`);
+      this.setNodeState('rxNodeReassembly', 'active', `${event.progress_pct}%`);
+    }
+    else if (event.type === 'rx_reassembly') {
+      this.reassemblyPct = 100;
+      const reassemblyEl = document.getElementById('flowRxReassemblyPct');
+      if (reassemblyEl) reassemblyEl.textContent = `100%`;
+
+      const fragsEl = document.getElementById('flowRxFragmentsDecoded');
+      if (fragsEl && (event.total_fragments || this.totalFragments)) {
+        const total = event.total_fragments || this.totalFragments;
+        fragsEl.textContent = `${total} / ${total}`;
+      }
+
+      this.setNodeState('rxNodeExtraction', 'success', 'COMPLETE');
+      this.setNodeState('rxNodeReassembly', 'success', event.frame_size ? `100% (${event.frame_size}B)` : '100%');
+      this.setNodeState('rxNodeCrypto', 'active', 'VERIFYING');
+    }
+    else if (event.type === 'rx_auth_status') {
+      const authEl = document.getElementById('flowRxAuthStatus');
+      const decryptEl = document.getElementById('flowRxDecryptStatus');
+
+      if (event.auth === 'SUCCESS') {
+        if (authEl) {
+          authEl.textContent = 'SUCCESS';
+          authEl.className = 'flow-metric-value flow-status-text success';
+        }
+        if (decryptEl) {
+          decryptEl.textContent = 'SUCCESS';
+          decryptEl.className = 'flow-metric-value flow-status-text success';
+        }
+        this.setNodeState('rxNodeCrypto', 'success', '✓ AUTH_OK');
+        const banner = document.getElementById('flowRxDiagnosticBanner');
+        if (banner) banner.style.display = 'none';
+      } else {
+        if (authEl) {
+          authEl.textContent = 'FAILED';
+          authEl.className = 'flow-metric-value flow-status-text error';
+        }
+        if (decryptEl) {
+          decryptEl.textContent = 'FAILED';
+          decryptEl.className = 'flow-metric-value flow-status-text error';
+        }
+        this.setNodeState('rxNodeCrypto', 'error', '✗ TAG MISMATCH');
+        this.setRxState('FAILED');
+
+        const banner = document.getElementById('flowRxDiagnosticBanner');
+        const text = document.getElementById('flowRxDiagnosticText');
+        if (banner && text) {
+          text.textContent = `AUTHENTICATION FAILED: ${event.error || 'Authentication tag mismatch. Check shared secret passphrase!'}`;
+          banner.style.display = 'flex';
+        }
+      }
+    }
+    else if (event.type === 'rx_message_recovered') {
+      this.setRxState('COMPLETED');
+      this.setNodeState('rxNodeSync', 'success', '✓ 0xDEAD');
+      this.setNodeState('rxNodeExtraction', 'success', 'COMPLETE');
+      this.setNodeState('rxNodeReassembly', 'success', '100%');
+      this.setNodeState('rxNodeCrypto', 'success', '✓ AUTH_OK');
+      this.setNodeState('rxNodeMessage', 'success', '✓ RECOVERED');
+
+      const reassemblyEl = document.getElementById('flowRxReassemblyPct');
+      if (reassemblyEl) reassemblyEl.textContent = '100%';
+
+      const fragsEl = document.getElementById('flowRxFragmentsDecoded');
+      if (fragsEl && this.totalFragments) {
+        fragsEl.textContent = `${this.totalFragments} / ${this.totalFragments}`;
+      }
+
+      const authEl = document.getElementById('flowRxAuthStatus');
+      if (authEl) {
+        authEl.textContent = 'SUCCESS';
+        authEl.className = 'flow-metric-value flow-status-text success';
+      }
+
+      const decryptEl = document.getElementById('flowRxDecryptStatus');
+      if (decryptEl) {
+        decryptEl.textContent = 'SUCCESS';
+        decryptEl.className = 'flow-metric-value flow-status-text success';
+      }
+
+      const msgStateEl = document.getElementById('flowRxMessageState');
+      if (msgStateEl) {
+        msgStateEl.textContent = 'RECOVERED';
+        msgStateEl.className = 'flow-metric-value flow-status-text success';
+      }
+
+      const termTag = document.getElementById('flowTerminalTag');
+      if (termTag) {
+        termTag.textContent = 'AUTHENTICATED';
+        termTag.className = 'badge-tag success';
+      }
+
+      this.revealTypewriterText(event.message);
+    }
+    else if (event.type === 'rx_stopped') {
+      if (this.state !== 'COMPLETED') {
+        this.setRxState('IDLE', 'STOPPED');
+      }
+    }
+  },
+
+  revealTypewriterText(plainText) {
+    if (!this.terminalEl) return;
+    if (this.typewriterTimer) clearInterval(this.typewriterTimer);
+
+    this.terminalEl.className = 'flow-terminal-body revealed';
+    this.terminalEl.innerHTML = '<span class="flow-cursor">&gt; </span>';
+
+    let index = 0;
+    const textLen = plainText.length;
+    const speed = Math.max(12, Math.min(35, 1000 / textLen));
+
+    this.typewriterTimer = setInterval(() => {
+      if (index < textLen) {
+        const char = plainText[index];
+        const span = document.createElement('span');
+        span.textContent = char;
+        this.terminalEl.appendChild(span);
+        index++;
+      } else {
+        clearInterval(this.typewriterTimer);
+        this.typewriterTimer = null;
+      }
+    }, speed);
+  }
+};
+
+/* ==========================================================================
    4. SCREEN 2: SENDER CONTROLLER (Real AES-256-GCM Backend & Validation)
    ========================================================================== */
 function initSender() {
@@ -206,6 +860,8 @@ function initSender() {
 
   let isPrepared = false;
   let preparedData = null;
+
+  TransmissionFlow.init();
 
   if (messageInput && charCounter) {
     messageInput.addEventListener('input', () => {
@@ -240,6 +896,7 @@ function initSender() {
       timingGroup.style.display = modeSelect.value === 'temporal' ? 'block' : 'none';
       if (previewSection) previewSection.style.display = 'none';
       isPrepared = false;
+      TransmissionFlow.setMode(modeSelect.value);
     });
   }
 
@@ -265,6 +922,7 @@ function initSender() {
       if (previewSection) previewSection.style.display = 'none';
       isPrepared = false;
       preparedData = null;
+      TransmissionFlow.reset();
     });
   }
 
@@ -329,6 +987,8 @@ function initSender() {
             previewSection.scrollIntoView({ behavior: 'smooth' });
           }
 
+          TransmissionFlow.onPrepared(data);
+
           showToast(`✓ Encrypted via AES-256-GCM: ${data.frame_size_bytes}B framed into ${data.fragment_count} packets`, 'success');
         } else {
           showToast(`Encryption failed: ${data.error}`, 'error');
@@ -370,6 +1030,8 @@ function initSender() {
       if (progressLabel) progressLabel.textContent = `Transmitting ${totalPkts} packets...`;
       if (progressBar) progressBar.style.width = '50%';
 
+      TransmissionFlow.setTxState('TRANSMITTING');
+
       try {
         const res = await fetch('/send', {
           method: 'POST',
@@ -389,15 +1051,18 @@ function initSender() {
           const stats = data.stats;
           if (progressBar) progressBar.style.width = '100%';
           if (progressLabel) progressLabel.textContent = `${stats.packets_sent} / ${stats.packets_sent} packets (100%)`;
+          TransmissionFlow.handleEvent({ type: 'tx_completed', stats: stats });
           showToast(`✓ Transmitted ${stats.packets_sent} packets in ${stats.duration_seconds.toFixed(2)}s (${stats.throughput_bps.toFixed(1)} bps)`, 'success');
         } else {
           if (progressBar) progressBar.style.width = '0%';
           if (progressLabel) progressLabel.textContent = `FAILED`;
+          TransmissionFlow.handleEvent({ type: 'tx_failed', error: data.error || 'Unknown transmission error' });
           showToast(`Transmission Failed: ${data.error || 'Unknown error'}`, 'error');
         }
       } catch (err) {
         if (progressBar) progressBar.style.width = '0%';
         if (progressLabel) progressLabel.textContent = `NETWORK ERROR`;
+        TransmissionFlow.handleEvent({ type: 'tx_failed', error: err.message });
         showToast(`Transmission Network Error: ${err.message}`, 'error');
       } finally {
         startSendBtn.disabled = false;
@@ -429,6 +1094,8 @@ function initReceiver() {
   let eventSource = null;
   let packetCount = 0;
   let lastPacketTime = null;
+
+  ReceptionFlow.init();
 
   function resetChecklist() {
     if (authErrorBanner) authErrorBanner.style.display = 'none';
@@ -489,6 +1156,10 @@ function initReceiver() {
       try {
         const data = JSON.parse(event.data);
         if (!data) return;
+
+        // Dispatch to TransmissionFlow and ReceptionFlow
+        TransmissionFlow.handleEvent(data);
+        ReceptionFlow.handleEvent(data);
 
         if (data.type === 'status') {
           const msg = data.message || '';
@@ -562,6 +1233,9 @@ function initReceiver() {
     };
   }
 
+  // Connect SSE listener globally so it receives events on all views
+  connectReceiverStream();
+
   if (startBtn) {
     startBtn.addEventListener('click', async () => {
       const secret = document.getElementById('receiverSecret')?.value.trim() || '';
@@ -592,6 +1266,7 @@ function initReceiver() {
           packetCount = 0;
           lastPacketTime = null;
           resetChecklist();
+          ReceptionFlow.handleEvent({ type: 'rx_started', channel: mode === 'header' ? 'IP-ID Header Embedding' : 'Temporal IPD' });
           connectReceiverStream();
           showToast('✓ Sniffer active: Listening for ICMP covert packets...', 'info');
         } else {
@@ -611,10 +1286,7 @@ function initReceiver() {
       stopBtn.disabled = true;
       if (liveBadge) liveBadge.style.display = 'none';
 
-      if (eventSource) {
-        eventSource.close();
-        eventSource = null;
-      }
+      ReceptionFlow.handleEvent({ type: 'rx_stopped' });
 
       try {
         await fetch('/stop', { method: 'POST' });

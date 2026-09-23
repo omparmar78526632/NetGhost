@@ -48,7 +48,7 @@ class HeaderChannelSender:
         self.packets_sent = 0
         self.transmission_log = []
     
-    def send_message(self, plaintext: str, passphrase: str) -> Dict[str, Any]:
+    def send_message(self, plaintext: str, passphrase: str, packet_callback: Any = None) -> Dict[str, Any]:
         """
         Send a message using header field steganography.
         
@@ -61,6 +61,7 @@ class HeaderChannelSender:
         Args:
             plaintext: Message to send
             passphrase: Pre-shared key for encryption
+            packet_callback: Optional callable(event_dict) for real-time visualization events
         
         Returns:
             Dictionary with transmission statistics
@@ -83,7 +84,33 @@ class HeaderChannelSender:
         
         # Step 3: Convert to 16-bit chunks
         chunks = bytes_to_uint16_list(frame)
-        logger.info(f"Split into {len(chunks)} chunks (16-bit each)")
+        total_chunks = len(chunks)
+        logger.info(f"Split into {total_chunks} chunks (16-bit each)")
+
+        if packet_callback:
+            try:
+                packet_callback({
+                    'type': 'tx_started',
+                    'channel': 'IP-ID Header Embedding',
+                    'mode': 'header',
+                    'total_packets': total_chunks,
+                    'plaintext_len': len(plaintext),
+                    'encrypted_len': len(encrypted),
+                    'frame_size': len(frame),
+                    'timing_profile': 'Direct',
+                    'timestamp': start_time
+                })
+                packet_callback({
+                    'type': 'tx_encrypt_complete',
+                    'encrypted_length': len(encrypted),
+                    'frame_size': len(frame)
+                })
+                packet_callback({
+                    'type': 'tx_fragment_complete',
+                    'fragment_count': total_chunks
+                })
+            except Exception:
+                pass
         
         # Step 4: Send packets
         for i, chunk in enumerate(chunks):
@@ -94,11 +121,28 @@ class HeaderChannelSender:
             send(packet, verbose=False)
             
             self.packets_sent += 1
-            self.transmission_log.append({
-                'packet_num': i,
+            entry = {
+                'packet_num': i + 1,
                 'ip_id': chunk,
-                'ip_id_hex': f'0x{chunk:04X}'
-            })
+                'ip_id_hex': f'0x{chunk:04X}',
+                'is_sync': chunk == 0xDEAD
+            }
+            self.transmission_log.append(entry)
+
+            if packet_callback:
+                try:
+                    packet_callback({
+                        'type': 'tx_packet',
+                        'index': i + 1,
+                        'total': total_chunks,
+                        'ip_id': chunk,
+                        'ip_id_hex': f'0x{chunk:04X}',
+                        'channel': 'IP-ID Header Embedding',
+                        'is_sync': chunk == 0xDEAD,
+                        'timestamp': time.time()
+                    })
+                except Exception:
+                    pass
             
             # Small delay between packets to avoid overwhelming receiver
             time.sleep(0.01)
@@ -109,6 +153,7 @@ class HeaderChannelSender:
         # Calculate statistics
         stats = {
             'mode': 'header',
+            'channel_label': 'IP-ID Header Embedding',
             'plaintext_length': len(plaintext),
             'encrypted_length': len(encrypted),
             'frame_size': len(frame),
@@ -120,6 +165,16 @@ class HeaderChannelSender:
         
         logger.info(f"Transmission complete: {self.packets_sent} packets in {duration:.2f}s")
         logger.info(f"Throughput: {stats['throughput_bps']:.2f} bps")
+
+        if packet_callback:
+            try:
+                packet_callback({
+                    'type': 'tx_completed',
+                    'stats': stats,
+                    'timestamp': end_time
+                })
+            except Exception:
+                pass
         
         return stats
 
@@ -148,7 +203,8 @@ class TemporalChannelSender:
         bit_0_delay: float = 0.050,
         bit_1_delay: float = 0.100,
         timing_profile: str = 'constant',
-        gmm_model=None
+        gmm_model=None,
+        packet_callback: Any = None
     ) -> Dict[str, Any]:
         """
         Send a message using temporal IPD steganography.
@@ -166,6 +222,7 @@ class TemporalChannelSender:
             bit_1_delay: Delay for bit 1 in seconds
             timing_profile: 'constant', 'normal', 'gamma', or 'gmm'
             gmm_model: Trained GMM model (if timing_profile=='gmm')
+            packet_callback: Optional callable(event_dict) for real-time visualization events
         
         Returns:
             Dictionary with transmission statistics
@@ -190,7 +247,41 @@ class TemporalChannelSender:
         
         # Step 3: Convert to bits
         bits = bytes_to_bits(frame)
+        total_packets = len(bits) + 1
         logger.info(f"Bit stream length: {len(bits)} bits")
+
+        timing_profile_label = {
+            'constant': 'Constant Delay',
+            'normal': 'Normal / Variable Load',
+            'gamma': 'Gamma Distribution',
+            'gmm': 'GMM Fitted Distribution'
+        }.get(timing_profile, timing_profile.upper())
+
+        if packet_callback:
+            try:
+                packet_callback({
+                    'type': 'tx_started',
+                    'channel': 'Temporal IPD',
+                    'mode': 'temporal',
+                    'total_packets': total_packets,
+                    'bit_count': len(bits),
+                    'plaintext_len': len(plaintext),
+                    'encrypted_len': len(encrypted),
+                    'frame_size': len(frame),
+                    'timing_profile': timing_profile_label,
+                    'timestamp': start_time
+                })
+                packet_callback({
+                    'type': 'tx_encrypt_complete',
+                    'encrypted_length': len(encrypted),
+                    'frame_size': len(frame)
+                })
+                packet_callback({
+                    'type': 'tx_fragment_complete',
+                    'fragment_count': total_packets
+                })
+            except Exception:
+                pass
         
         # Step 4: Send initial synchronization lead packet
         packet = IP(dst=self.target_ip) / ICMP(seq=0)
@@ -198,11 +289,28 @@ class TemporalChannelSender:
         self.packets_sent += 1
         timestamp = time.time()
         self.transmission_log.append({
-            'packet_num': 0,
+            'packet_num': 1,
             'bit': None,
             'intended_delay_ms': 0,
             'timestamp': timestamp
         })
+
+        if packet_callback:
+            try:
+                packet_callback({
+                    'type': 'tx_packet',
+                    'index': 1,
+                    'total': total_packets,
+                    'channel': 'Temporal IPD',
+                    'bit': None,
+                    'intended_delay_ms': 0.0,
+                    'actual_delay_ms': 0.0,
+                    'timing_profile': timing_profile_label,
+                    'is_sync': True,
+                    'timestamp': timestamp
+                })
+            except Exception:
+                pass
 
         # Step 5: Send timed packets for each bit in the stream
         for i, bit in enumerate(bits):
@@ -246,11 +354,28 @@ class TemporalChannelSender:
             timestamp = time.time()
             self.packets_sent += 1
             self.transmission_log.append({
-                'packet_num': i + 1,
+                'packet_num': i + 2,
                 'bit': bit,
                 'intended_delay_ms': delay * 1000,
                 'timestamp': timestamp
             })
+
+            if packet_callback:
+                try:
+                    packet_callback({
+                        'type': 'tx_packet',
+                        'index': i + 2,
+                        'total': total_packets,
+                        'channel': 'Temporal IPD',
+                        'bit': bit,
+                        'intended_delay_ms': round(delay * 1000, 1),
+                        'actual_delay_ms': round(delay * 1000, 1),
+                        'timing_profile': timing_profile_label,
+                        'is_sync': False,
+                        'timestamp': timestamp
+                    })
+                except Exception:
+                    pass
         
         end_time = time.time()
         duration = end_time - start_time
@@ -264,7 +389,9 @@ class TemporalChannelSender:
         # Calculate statistics
         stats = {
             'mode': 'temporal',
+            'channel_label': 'Temporal IPD',
             'timing_profile': timing_profile,
+            'timing_profile_label': timing_profile_label,
             'plaintext_length': len(plaintext),
             'encrypted_length': len(encrypted),
             'frame_size': len(frame),
@@ -277,6 +404,16 @@ class TemporalChannelSender:
         
         logger.info(f"Transmission complete: {self.packets_sent} packets in {duration:.2f}s")
         logger.info(f"Throughput: {stats['throughput_bps']:.2f} bps")
+
+        if packet_callback:
+            try:
+                packet_callback({
+                    'type': 'tx_completed',
+                    'stats': stats,
+                    'timestamp': end_time
+                })
+            except Exception:
+                pass
         
         return stats
 

@@ -80,6 +80,7 @@ class HeaderChannelReceiver:
         self.last_message = None
         self.last_error = None
         self.status_callback = None
+        self.event_callback = None
         self.message_callback = None
         self.sniff_thread = None
     
@@ -102,10 +103,22 @@ class HeaderChannelReceiver:
     def set_status_callback(self, callback: Callable):
         """Set callback for status updates"""
         self.status_callback = callback
+
+    def set_event_callback(self, callback: Callable):
+        """Set callback for structured visualization events"""
+        self.event_callback = callback
     
     def set_message_callback(self, callback: Callable):
         """Set callback for decoded messages"""
         self.message_callback = callback
+
+    def _emit_event(self, event_data: dict):
+        """Broadcast structured event to event callback"""
+        if self.event_callback:
+            try:
+                self.event_callback(event_data)
+            except Exception:
+                pass
     
     def _update_status(self, status: str):
         """Send status update"""
@@ -117,6 +130,7 @@ class HeaderChannelReceiver:
                 self.status_callback(status)
             except Exception:
                 pass
+        self._emit_event({'type': 'rx_status', 'message': status, 'timestamp': time.time()})
         try:
             logger.info(status)
         except Exception:
@@ -146,6 +160,12 @@ class HeaderChannelReceiver:
                 is_sync = ip_id == 0xDEAD
                 if is_sync:
                     self.sync_detected = True
+                    self._emit_event({
+                        'type': 'rx_sync_detected',
+                        'marker': '0xDEAD',
+                        'channel': 'IP-ID Header Embedding',
+                        'timestamp': curr_time
+                    })
 
                 # Compute inter-packet delay for temporal analysis
                 if len(self.timestamps) > 1:
@@ -154,6 +174,7 @@ class HeaderChannelReceiver:
                     self.bits.append(bit)
                     pkt_entry = {
                         'packet_num': self.icmp_packets,
+                        'ip_id': ip_id,
                         'ip_id_hex': f"0x{ip_id:04X}",
                         'delay_ms': round(delay_ms, 1),
                         'bit': bit,
@@ -161,6 +182,17 @@ class HeaderChannelReceiver:
                         'timestamp': curr_time
                     }
                     self.captured_packets_log.append(pkt_entry)
+                    self._emit_event({
+                        'type': 'rx_packet',
+                        'index': self.icmp_packets,
+                        'ip_id': ip_id,
+                        'ip_id_hex': f"0x{ip_id:04X}",
+                        'delay_ms': round(delay_ms, 1),
+                        'bit': bit,
+                        'is_sync': is_sync,
+                        'channel': 'IP-ID Header Embedding',
+                        'timestamp': curr_time
+                    })
                     self._update_status(
                         f"Packet {self.icmp_packets}: IP.id=0x{ip_id:04X} ({ip_id}) | Δt={delay_ms:.1f}ms → bit {bit}"
                     )
@@ -170,6 +202,7 @@ class HeaderChannelReceiver:
                 else:
                     pkt_entry = {
                         'packet_num': self.icmp_packets,
+                        'ip_id': ip_id,
                         'ip_id_hex': f"0x{ip_id:04X}",
                         'delay_ms': 0.0,
                         'bit': None,
@@ -177,6 +210,17 @@ class HeaderChannelReceiver:
                         'timestamp': curr_time
                     }
                     self.captured_packets_log.append(pkt_entry)
+                    self._emit_event({
+                        'type': 'rx_packet',
+                        'index': self.icmp_packets,
+                        'ip_id': ip_id,
+                        'ip_id_hex': f"0x{ip_id:04X}",
+                        'delay_ms': 0.0,
+                        'bit': None,
+                        'is_sync': is_sync,
+                        'channel': 'IP-ID Header Embedding',
+                        'timestamp': curr_time
+                    })
                     self._update_status(
                         f"Packet {self.icmp_packets}: IP.id=0x{ip_id:04X} ({ip_id})"
                     )
@@ -208,6 +252,17 @@ class HeaderChannelReceiver:
             needed_chunks = (payload_len + 1) // 2
             total_needed = sync_idx + 2 + needed_chunks
             
+            current_chunks_arrived = len(self.uint16_values) - (sync_idx + 2)
+            progress_pct = min(100, max(0, int((current_chunks_arrived / needed_chunks) * 100))) if needed_chunks > 0 else 0
+
+            self._emit_event({
+                'type': 'rx_fragment',
+                'index': current_chunks_arrived,
+                'total': needed_chunks,
+                'progress_pct': progress_pct,
+                'channel': 'IP-ID Header Embedding'
+            })
+            
             if len(self.uint16_values) < total_needed:
                 # Frame is still arriving, wait for more packets
                 self.sync_detected = True
@@ -219,6 +274,13 @@ class HeaderChannelReceiver:
             payload_bytes = uint16_list_to_bytes(payload_chunks)[:payload_len]
             
             self.frame_extracted = True
+            self._emit_event({
+                'type': 'rx_reassembly',
+                'status': 'success',
+                'frame_size': len(payload_bytes),
+                'total_fragments': needed_chunks,
+                'progress_pct': 100
+            })
             self._update_status("✓ Sync marker detected (Header Channel)!")
             self._update_status(f"✓ Frame extracted: {len(payload_bytes)} bytes")
             
@@ -227,6 +289,15 @@ class HeaderChannelReceiver:
                 self.decryption_success = True
                 self.last_message = plaintext
                 self.last_error = None
+                self._emit_event({
+                    'type': 'rx_auth_status',
+                    'auth': 'SUCCESS',
+                    'decrypt': 'SUCCESS'
+                })
+                self._emit_event({
+                    'type': 'rx_message_recovered',
+                    'message': plaintext
+                })
                 self._update_status("✓ Decryption successful!")
                 self._update_status(f"✓ Message: {plaintext}")
                 
@@ -241,6 +312,12 @@ class HeaderChannelReceiver:
             except ValueError as e:
                 self.decryption_success = False
                 self.last_error = str(e)
+                self._emit_event({
+                    'type': 'rx_auth_status',
+                    'auth': 'FAILED',
+                    'decrypt': 'FAILED',
+                    'error': str(e)
+                })
                 self._update_status(f"✗ Decryption failed: Check if passphrase matches sender! ({str(e)})")
                 self.uint16_values = self.uint16_values[sync_idx + 1:]
                 return False
@@ -265,6 +342,11 @@ class HeaderChannelReceiver:
             return False
         
         self.sync_detected = True
+        self._emit_event({
+            'type': 'rx_sync_detected',
+            'marker': '0xDEAD',
+            'channel': 'Temporal IPD'
+        })
         
         # Check if we have 16 bits for length after sync
         if len(self.bits) < sync_idx + 32:
@@ -280,6 +362,18 @@ class HeaderChannelReceiver:
             return False
         
         total_bits_needed = sync_idx + 32 + (payload_len * 8)
+        current_bits = len(self.bits) - (sync_idx + 32)
+        total_payload_bits = payload_len * 8
+        progress_pct = min(100, max(0, int((current_bits / total_payload_bits) * 100))) if total_payload_bits > 0 else 0
+
+        self._emit_event({
+            'type': 'rx_fragment',
+            'index': current_bits,
+            'total': total_payload_bits,
+            'progress_pct': progress_pct,
+            'channel': 'Temporal IPD'
+        })
+
         if len(self.bits) < total_bits_needed:
             return False
         
@@ -287,6 +381,13 @@ class HeaderChannelReceiver:
         payload_bytes = bits_to_bytes(payload_bits)
         
         self.frame_extracted = True
+        self._emit_event({
+            'type': 'rx_reassembly',
+            'status': 'success',
+            'frame_size': len(payload_bytes),
+            'total_fragments': total_payload_bits,
+            'progress_pct': 100
+        })
         self._update_status("✓ Sync marker detected (Temporal Channel)!")
         self._update_status(f"✓ Frame extracted: {len(payload_bytes)} bytes")
         
@@ -295,6 +396,15 @@ class HeaderChannelReceiver:
             self.decryption_success = True
             self.last_message = plaintext
             self.last_error = None
+            self._emit_event({
+                'type': 'rx_auth_status',
+                'auth': 'SUCCESS',
+                'decrypt': 'SUCCESS'
+            })
+            self._emit_event({
+                'type': 'rx_message_recovered',
+                'message': plaintext
+            })
             self._update_status("✓ Decryption successful!")
             self._update_status(f"✓ Message: {plaintext}")
             
@@ -309,6 +419,12 @@ class HeaderChannelReceiver:
         except ValueError as e:
             self.decryption_success = False
             self.last_error = str(e)
+            self._emit_event({
+                'type': 'rx_auth_status',
+                'auth': 'FAILED',
+                'decrypt': 'FAILED',
+                'error': str(e)
+            })
             self._update_status(f"✗ Decryption failed: Check if passphrase matches sender! ({str(e)})")
             self.bits = self.bits[sync_idx + 1:]
             return False
@@ -337,6 +453,13 @@ class HeaderChannelReceiver:
         target_iface = resolve_sniff_interfaces(interface)
         self._update_status(f"Starting receiver (Auto-Detect Header & Temporal)...")
         self._update_status(f"Interface: {interface if interface else 'all (including loopback)'}")
+
+        self._emit_event({
+            'type': 'rx_started',
+            'channel': 'IP-ID Header Embedding & Temporal IPD',
+            'interface': interface if interface else 'all (including loopback)',
+            'timestamp': time.time()
+        })
         
         # Start sniffing in background thread
         def sniff_worker():
@@ -353,6 +476,7 @@ class HeaderChannelReceiver:
                 self._update_status(f"Error: {str(e)}")
             finally:
                 self.running = False
+                self._emit_event({'type': 'rx_stopped', 'timestamp': time.time()})
         
         self.sniff_thread = threading.Thread(target=sniff_worker, daemon=True)
         self.sniff_thread.start()
@@ -360,6 +484,7 @@ class HeaderChannelReceiver:
     def stop_listening(self):
         """Stop listening for packets"""
         self.running = False
+        self._emit_event({'type': 'rx_stopped', 'timestamp': time.time()})
         self._update_status("Stopping receiver...")
 
 
@@ -393,6 +518,7 @@ class TemporalChannelReceiver:
         self.last_message = None
         self.last_error = None
         self.status_callback = None
+        self.event_callback = None
         self.message_callback = None
         self.sniff_thread = None
     
@@ -415,10 +541,22 @@ class TemporalChannelReceiver:
     def set_status_callback(self, callback: Callable):
         """Set callback for status updates"""
         self.status_callback = callback
+
+    def set_event_callback(self, callback: Callable):
+        """Set callback for structured visualization events"""
+        self.event_callback = callback
     
     def set_message_callback(self, callback: Callable):
         """Set callback for decoded messages"""
         self.message_callback = callback
+
+    def _emit_event(self, event_data: dict):
+        """Broadcast structured event to event callback"""
+        if self.event_callback:
+            try:
+                self.event_callback(event_data)
+            except Exception:
+                pass
     
     def _update_status(self, status: str):
         """Send status update"""
@@ -430,6 +568,7 @@ class TemporalChannelReceiver:
                 self.status_callback(status)
             except Exception:
                 pass
+        self._emit_event({'type': 'rx_status', 'message': status, 'timestamp': time.time()})
         try:
             logger.info(status)
         except Exception:
@@ -467,6 +606,7 @@ class TemporalChannelReceiver:
                     
                     pkt_entry = {
                         'packet_num': self.icmp_packets,
+                        'ip_id': packet[IP].id,
                         'ip_id_hex': f"0x{packet[IP].id:04X}",
                         'delay_ms': round(delay_ms, 1),
                         'bit': bit,
@@ -474,6 +614,17 @@ class TemporalChannelReceiver:
                         'timestamp': timestamp
                     }
                     self.captured_packets_log.append(pkt_entry)
+                    self._emit_event({
+                        'type': 'rx_packet',
+                        'index': self.icmp_packets,
+                        'ip_id': packet[IP].id,
+                        'ip_id_hex': f"0x{packet[IP].id:04X}",
+                        'delay_ms': round(delay_ms, 1),
+                        'bit': bit,
+                        'is_sync': False,
+                        'channel': 'Temporal IPD',
+                        'timestamp': timestamp
+                    })
                     
                     self._update_status(
                         f"Packet {self.icmp_packets}: Δt={delay_ms:.1f}ms → bit {bit}"
@@ -484,6 +635,7 @@ class TemporalChannelReceiver:
                 else:
                     pkt_entry = {
                         'packet_num': self.icmp_packets,
+                        'ip_id': packet[IP].id,
                         'ip_id_hex': f"0x{packet[IP].id:04X}",
                         'delay_ms': 0.0,
                         'bit': None,
@@ -491,7 +643,18 @@ class TemporalChannelReceiver:
                         'timestamp': timestamp
                     }
                     self.captured_packets_log.append(pkt_entry)
-                    self._update_status(f"Packet {self.icmp_packets}: First packet (no delay)")
+                    self._emit_event({
+                        'type': 'rx_packet',
+                        'index': self.icmp_packets,
+                        'ip_id': packet[IP].id,
+                        'ip_id_hex': f"0x{packet[IP].id:04X}",
+                        'delay_ms': 0.0,
+                        'bit': None,
+                        'is_sync': True,
+                        'channel': 'Temporal IPD',
+                        'timestamp': timestamp
+                    })
+                    self._update_status(f"Packet {self.icmp_packets}: First packet (lead sync)")
     
     def _try_decode(self):
         """Attempt to decode frame from collected bits with bit-level sync alignment"""
@@ -512,6 +675,11 @@ class TemporalChannelReceiver:
             return
         
         self.sync_detected = True
+        self._emit_event({
+            'type': 'rx_sync_detected',
+            'marker': '0xDEAD',
+            'channel': 'Temporal IPD'
+        })
         
         # Check if we have 16 bits for length after sync
         if len(self.bits) < sync_idx + 32:
@@ -527,6 +695,18 @@ class TemporalChannelReceiver:
             return
         
         total_bits_needed = sync_idx + 32 + (payload_len * 8)
+        current_bits = len(self.bits) - (sync_idx + 32)
+        total_payload_bits = payload_len * 8
+        progress_pct = min(100, max(0, int((current_bits / total_payload_bits) * 100))) if total_payload_bits > 0 else 0
+
+        self._emit_event({
+            'type': 'rx_fragment',
+            'index': current_bits,
+            'total': total_payload_bits,
+            'progress_pct': progress_pct,
+            'channel': 'Temporal IPD'
+        })
+
         if len(self.bits) < total_bits_needed:
             return
         
@@ -534,6 +714,13 @@ class TemporalChannelReceiver:
         payload_bytes = bits_to_bytes(payload_bits)
         
         self.frame_extracted = True
+        self._emit_event({
+            'type': 'rx_reassembly',
+            'status': 'success',
+            'frame_size': len(payload_bytes),
+            'total_fragments': total_payload_bits,
+            'progress_pct': 100
+        })
         self._update_status("✓ Sync marker detected (Temporal Channel)!")
         self._update_status(f"✓ Frame extracted: {len(payload_bytes)} bytes")
         
@@ -542,6 +729,15 @@ class TemporalChannelReceiver:
             self.decryption_success = True
             self.last_message = plaintext
             self.last_error = None
+            self._emit_event({
+                'type': 'rx_auth_status',
+                'auth': 'SUCCESS',
+                'decrypt': 'SUCCESS'
+            })
+            self._emit_event({
+                'type': 'rx_message_recovered',
+                'message': plaintext
+            })
             self._update_status("✓ Decryption successful!")
             self._update_status(f"✓ Message: {plaintext}")
             
@@ -555,6 +751,12 @@ class TemporalChannelReceiver:
         except ValueError as e:
             self.decryption_success = False
             self.last_error = str(e)
+            self._emit_event({
+                'type': 'rx_auth_status',
+                'auth': 'FAILED',
+                'decrypt': 'FAILED',
+                'error': str(e)
+            })
             self._update_status(f"✗ Decryption failed: Check if passphrase matches sender! ({str(e)})")
             self.bits = self.bits[sync_idx + 1:]
     
@@ -582,6 +784,13 @@ class TemporalChannelReceiver:
         self._update_status(f"Starting temporal channel receiver...")
         self._update_status(f"Interface: {interface if interface else 'all (including loopback)'}")
         self._update_status(f"Threshold: {self.threshold_ms}ms")
+
+        self._emit_event({
+            'type': 'rx_started',
+            'channel': 'Temporal IPD',
+            'interface': interface if interface else 'all (including loopback)',
+            'timestamp': time.time()
+        })
         
         # Start sniffing in background thread
         def sniff_worker():
@@ -598,6 +807,7 @@ class TemporalChannelReceiver:
                 self._update_status(f"Error: {str(e)}")
             finally:
                 self.running = False
+                self._emit_event({'type': 'rx_stopped', 'timestamp': time.time()})
         
         self.sniff_thread = threading.Thread(target=sniff_worker, daemon=True)
         self.sniff_thread.start()
@@ -605,6 +815,7 @@ class TemporalChannelReceiver:
     def stop_listening(self):
         """Stop listening for packets"""
         self.running = False
+        self._emit_event({'type': 'rx_stopped', 'timestamp': time.time()})
         self._update_status("Stopping receiver...")
 
 

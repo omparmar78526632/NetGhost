@@ -609,7 +609,7 @@ def send_message():
         
         if mode == 'header':
             sender = HeaderChannelSender(target_ip)
-            stats = sender.send_message(message, passphrase)
+            stats = sender.send_message(message, passphrase, packet_callback=broadcast_sse_event)
             system_state['total_packets_sent'] += stats['packets_sent']
             system_state['total_bytes_sent'] += stats['frame_size']
             system_state['last_tx_time'] = time.time()
@@ -633,13 +633,14 @@ def send_message():
                 bit_0_delay=bit_0_delay,
                 bit_1_delay=bit_1_delay,
                 timing_profile=timing_profile,
-                gmm_model=model
+                gmm_model=model,
+                packet_callback=broadcast_sse_event
             )
             system_state['total_packets_sent'] += stats['packets_sent']
             system_state['total_bytes_sent'] += stats['frame_size']
             system_state['last_tx_time'] = time.time()
             system_state['status'] = 'COMPLETED'
-            log_audit_event('TX_TEMPORAL', f"Sent {stats['packets_sent']} packets ({stats['timing_profile']} IPD) to {target_ip}", 'SUCCESS')
+            log_audit_event('TX_TEMPORAL', f"Sent {stats['packets_sent']} packets ({stats.get('timing_profile_label', stats['timing_profile'])} IPD) to {target_ip}", 'SUCCESS')
             return jsonify({'success': True, 'stats': stats})
         
         else:
@@ -648,6 +649,7 @@ def send_message():
     except Exception as e:
         system_state['status'] = 'ERROR'
         system_state['pipeline']['sender'] = 'ERROR'
+        broadcast_sse_event({'type': 'tx_failed', 'error': str(e), 'timestamp': time.time()})
         log_audit_event('TX_ERROR', f"Transmission failed: {str(e)}", 'ERROR')
         return jsonify({'error': str(e)}), 500
 
@@ -696,6 +698,7 @@ def start_receiver():
             return jsonify({'error': f"Invalid receiver mode: {mode}"}), 400
         
         current_receiver.set_status_callback(status_callback)
+        current_receiver.set_event_callback(broadcast_sse_event)
         current_receiver.set_message_callback(message_callback)
         current_receiver.start_listening(interface=interface, timeout=600)
         
@@ -721,6 +724,7 @@ def stop_receiver():
         current_receiver.stop_listening()
         current_receiver = None
     
+    broadcast_sse_event({'type': 'rx_stopped', 'timestamp': time.time()})
     system_state['status'] = 'READY'
     system_state['pipeline']['receiver'] = 'READY'
     log_audit_event('RX_STOP', "Receiver sniffer stopped", 'INFO')
@@ -731,7 +735,7 @@ def stop_receiver():
 def stream():
     """Server-Sent Events stream for real-time packet observation & message decoding"""
     def event_stream():
-        client_q = queue.Queue(maxsize=200)
+        client_q = queue.Queue(maxsize=5000)
         with sse_lock:
             sse_subscribers.append(client_q)
         try:

@@ -1323,3 +1323,513 @@ body.light-theme .theme-toggle-thumb {
   gap: 12px;
 }
 
+/* ==========================================================================
+   LIVE TRANSMISSION & RECEPTION FLOW VISUALIZATION SYSTEM
+   ========================================================================== */
+
+.live-flow-card {
+  margin-top: 24px;
+  background: radial-gradient(circle at 10% 20%, #151828 0%, #0d0f1a 100%);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  position: relative;
+  overflow: hidden;
+}
+
+.live-flow-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #3b82f6, #06b6d4, transparent);
+  opacity: 0.8;
+}
+
+#receiverFlowCard {
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+#receiverFlowCard::before {
+  background: linear-gradient(90deg, transparent, #10b981, #06b6d4, transparent);
+}
+
+/* Pipeline Container */
+.flow-pipeline-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 10px;
+  background-color: #07090e;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+  overflow-x: auto;
+  gap: 4px;
+}
+
+.flow-stage-node {
+  flex: 1;
+  min-width: 105px;
+  max-width: 140px;
+  background-color: #0d1019;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.flow-stage-node.active {
+  border-color: #3b82f6;
+  background-color: rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.35);
+  transform: translateY(-2px);
+}
+
+.flow-stage-node.success {
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.12);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
+}
+
+.flow-stage-node.error {
+  border-color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.12);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.35);
+}
+
+.flow-node-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.flow-node-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.flow-node-subtitle {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.flow-node-badge {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #9ca3af;
+  margin-top: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.flow-stage-node.active .flow-node-badge {
+  background-color: rgba(59, 130, 246, 0.25);
+  color: #60a5fa;
+  border-color: #3b82f6;
+  font-weight: 600;
+}
+
+.flow-stage-node.success .flow-node-badge {
+  background-color: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+  border-color: #10b981;
+  font-weight: 600;
+}
+
+.flow-stage-node.error .flow-node-badge {
+  background-color: rgba(239, 68, 68, 0.25);
+  color: #f87171;
+  border-color: #ef4444;
+  font-weight: 600;
+}
+
+/* Connecting Link Lines */
+.flow-pipeline-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 42px;
+  padding: 0 2px;
+}
+
+.flow-link-label {
+  font-size: 0.58rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 3px;
+  white-space: nowrap;
+}
+
+.flow-link-line {
+  width: 100%;
+  height: 2px;
+  background: #1e2438;
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.flow-link-particle {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, #3b82f6, #60a5fa, transparent);
+  display: none;
+}
+
+.flow-pipeline-container.transmitting .flow-link-particle,
+.flow-pipeline-container.receiving .flow-link-particle {
+  display: block;
+  animation: linkPulse 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.rx-pipeline .flow-link-particle {
+  background: linear-gradient(90deg, transparent, #10b981, #34d399, transparent);
+}
+
+@keyframes linkPulse {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* Metrics Grid */
+.flow-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.flow-metric-item {
+  background-color: #0b0d14;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flow-metric-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.flow-metric-value {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.flow-status-text {
+  color: #60a5fa;
+}
+
+.flow-status-text.transmitting {
+  color: #f59e0b;
+  animation: statusPulse 1.5s infinite;
+}
+
+.flow-status-text.completed,
+.flow-status-text.success,
+.flow-status-text.active {
+  color: #34d399;
+}
+
+.flow-status-text.failed,
+.flow-status-text.error {
+  color: #f87171;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* Dynamic Mode Section */
+.flow-dynamic-display {
+  background-color: #07090f;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.flow-sub-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.flow-sub-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.flow-sub-stat,
+.flow-temporal-quickstats {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  display: flex;
+  gap: 14px;
+}
+
+/* Packet Conveyor Stream */
+.flow-packet-stream {
+  min-height: 96px;
+  max-height: 120px;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 4px;
+}
+
+.flow-empty-state {
+  width: 100%;
+  text-align: center;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-style: italic;
+  padding: 24px 0;
+}
+
+/* Reusable Packet Card */
+.ng-packet-card {
+  flex: 0 0 150px;
+  background: linear-gradient(135deg, #121524 0%, #0a0c16 100%);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  animation: slidePacketIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  position: relative;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.ng-packet-card:hover {
+  transform: translateY(-2px);
+  border-color: #60a5fa;
+}
+
+.ng-packet-card.sync-packet {
+  border-color: rgba(245, 158, 11, 0.6);
+  background: linear-gradient(135deg, #1f1810 0%, #0d0c0a 100%);
+}
+
+.ng-packet-card.rx-packet {
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.ng-packet-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+.ng-packet-num {
+  font-weight: 700;
+  color: #60a5fa;
+  font-size: 0.74rem;
+}
+
+.ng-packet-card.sync-packet .ng-packet-num {
+  color: #f59e0b;
+}
+
+.ng-packet-card.rx-packet .ng-packet-num {
+  color: #34d399;
+}
+
+.ng-packet-proto {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+}
+
+.ng-packet-field-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.68rem;
+  margin-top: 2px;
+}
+
+.ng-packet-field-key {
+  color: var(--text-muted);
+}
+
+.ng-packet-field-val {
+  font-weight: 700;
+  color: #e5e7eb;
+}
+
+@keyframes slidePacketIn {
+  from {
+    opacity: 0;
+    transform: translateX(-30px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* Temporal Timeline Track */
+.flow-timeline-track {
+  min-height: 96px;
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  padding: 10px 6px;
+  gap: 8px;
+  position: relative;
+}
+
+.flow-temporal-node {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: slidePacketIn 0.3s ease forwards;
+}
+
+.flow-temporal-pkt {
+  background: #111422;
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  padding: 6px 10px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+
+.flow-temporal-pkt strong {
+  color: #60a5fa;
+  display: block;
+}
+
+.flow-temporal-delay {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px dashed rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  padding: 3px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.flow-temporal-bit {
+  font-size: 0.62rem;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 700;
+  background: #1e293b;
+  color: #93c5fd;
+}
+
+/* Terminal Box */
+.flow-terminal-box {
+  background-color: #05060a;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-top: 14px;
+}
+
+.flow-terminal-bar {
+  background-color: #0d101a;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flow-terminal-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.flow-terminal-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #374151;
+}
+
+.flow-terminal-title {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.flow-terminal-body {
+  padding: 14px 16px;
+  min-height: 52px;
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  color: #e5e7eb;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.flow-terminal-body .flow-cursor {
+  color: #10b981;
+  font-weight: 700;
+}
+
+.flow-terminal-body.revealed {
+  color: #34d399;
+  text-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+/* Reduced Motion Override */
+@media (prefers-reduced-motion: reduce) {
+  .flow-pipeline-container.transmitting .flow-link-particle,
+  .flow-pipeline-container.receiving .flow-link-particle,
+  .flow-status-text.transmitting,
+  .ng-packet-card,
+  .flow-temporal-node {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+
