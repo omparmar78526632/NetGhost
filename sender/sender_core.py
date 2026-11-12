@@ -4,6 +4,7 @@ Implements both Header Field and Temporal IPD covert channels
 """
 
 import time
+import hashlib
 import logging
 import sys
 from typing import List, Dict, Any
@@ -21,6 +22,7 @@ if sys.platform == 'win32':
 from common.crypto import encrypt_message
 from common.framing import create_frame
 from common.utils import bytes_to_uint16_list, bytes_to_bits
+from common.timing import create_timing_profile
 
 
 # Configure logging
@@ -48,26 +50,45 @@ class HeaderChannelSender:
         self.packets_sent = 0
         self.transmission_log = []
     
-    def send_message(self, plaintext: str, passphrase: str, packet_callback: Any = None) -> Dict[str, Any]:
+    def send_message(
+        self,
+        plaintext: str,
+        passphrase: str,
+        packet_callback: Any = None,
+        timing_profile: str = 'normal',
+        gmm_model=None,
+        delay_ms: float = 50.0,
+    ) -> Dict[str, Any]:
         """
-        Send a message using header field steganography.
+        Send a message using header field steganography with configurable timing profile.
         
         Process:
-            1. Encrypt message
-            2. Create frame
-            3. Split into 16-bit chunks
-            4. Send each chunk in IP.id field
+            1. Validate & initialize timing profile
+            2. Encrypt message (AES-256-GCM)
+            3. Create frame (0xDEAD || length || payload)
+            4. Split into 16-bit chunks
+            5. Ask timing profile for next inter-packet delay and send each chunk in IP.id
         
         Args:
             plaintext: Message to send
             passphrase: Pre-shared key for encryption
             packet_callback: Optional callable(event_dict) for real-time visualization events
+            timing_profile: 'normal', 'constant', 'gamma', or 'gmm'
+            gmm_model: Trained TrafficProfiler instance (required when timing_profile=='gmm')
+            delay_ms: Base constant delay in milliseconds (used by 'constant' profile)
         
         Returns:
             Dictionary with transmission statistics
         """
+        # Validate timing profile first (fails fast if invalid or GMM not trained)
+        profile = create_timing_profile(
+            timing_profile,
+            gmm_model=gmm_model,
+            delay_ms=delay_ms,
+        )
+
         logger.info(f"Starting header channel transmission to {self.target_ip}")
-        logger.info(f"Message: '{plaintext}' ({len(plaintext)} bytes)")
+        logger.info(f"Message: '{plaintext}' ({len(plaintext)} bytes) | Timing Profile: {profile.label}")
         
         # Reset counters
         self.packets_sent = 0
@@ -85,7 +106,12 @@ class HeaderChannelSender:
         # Step 3: Convert to 16-bit chunks
         chunks = bytes_to_uint16_list(frame)
         total_chunks = len(chunks)
-        logger.info(f"Split into {total_chunks} chunks (16-bit each)")
+        frame_hash = hashlib.sha256(frame).hexdigest()[:16]
+        nonce_hex = encrypted[16:28].hex() if len(encrypted) >= 28 else ""
+        logger.info(
+            f"Split into {total_chunks} chunks (16-bit each) | "
+            f"frame_len={len(frame)}B | frame_hash={frame_hash} | nonce={nonce_hex}"
+        )
 
         if packet_callback:
             try:
@@ -97,7 +123,7 @@ class HeaderChannelSender:
                     'plaintext_len': len(plaintext),
                     'encrypted_len': len(encrypted),
                     'frame_size': len(frame),
-                    'timing_profile': 'Direct',
+                    'timing_profile': profile.label,
                     'timestamp': start_time
                 })
                 packet_callback({
@@ -112,19 +138,31 @@ class HeaderChannelSender:
             except Exception:
                 pass
         
-        # Step 4: Send packets
+        # Step 4: Send packets paced by the selected TimingProfile
+        prev_ts = None
         for i, chunk in enumerate(chunks):
+            intended_delay_s = 0.0
+            if i > 0:
+                intended_delay_s = profile.next_delay_s()
+                time.sleep(intended_delay_s)
+
             # Create ICMP Echo Request with embedded data in IP.id
             packet = IP(dst=self.target_ip, id=chunk) / ICMP(seq=i)
             
             # Send packet
             send(packet, verbose=False)
+            now_ts = time.time()
+            actual_delay_ms = ((now_ts - prev_ts) * 1000.0) if prev_ts is not None else 0.0
+            prev_ts = now_ts
             
             self.packets_sent += 1
             entry = {
                 'packet_num': i + 1,
                 'ip_id': chunk,
                 'ip_id_hex': f'0x{chunk:04X}',
+                'intended_delay_ms': round(intended_delay_s * 1000.0, 2),
+                'actual_delay_ms': round(actual_delay_ms, 2),
+                'timestamp': now_ts,
                 'is_sync': chunk == 0xDEAD
             }
             self.transmission_log.append(entry)
@@ -137,15 +175,15 @@ class HeaderChannelSender:
                         'total': total_chunks,
                         'ip_id': chunk,
                         'ip_id_hex': f'0x{chunk:04X}',
+                        'intended_delay_ms': round(intended_delay_s * 1000.0, 2),
+                        'actual_delay_ms': round(actual_delay_ms, 2),
+                        'timing_profile': profile.label,
                         'channel': 'IP-ID Header Embedding',
                         'is_sync': chunk == 0xDEAD,
-                        'timestamp': time.time()
+                        'timestamp': now_ts
                     })
                 except Exception:
                     pass
-            
-            # Small delay between packets to avoid overwhelming receiver
-            time.sleep(0.01)
         
         end_time = time.time()
         duration = end_time - start_time
@@ -154,6 +192,9 @@ class HeaderChannelSender:
         stats = {
             'mode': 'header',
             'channel_label': 'IP-ID Header Embedding',
+            'timing_profile': profile.name,
+            'timing_profile_label': profile.label,
+            'gmm_used': profile.name == 'gmm',
             'plaintext_length': len(plaintext),
             'encrypted_length': len(encrypted),
             'frame_size': len(frame),
@@ -163,7 +204,9 @@ class HeaderChannelSender:
             'transmission_log': self.transmission_log
         }
         
-        logger.info(f"Transmission complete: {self.packets_sent} packets in {duration:.2f}s")
+        first_delays = [e['intended_delay_ms'] for e in self.transmission_log[1:11]]
+        logger.info(f"First {len(first_delays)} intended delays (ms): {first_delays}")
+        logger.info(f"Transmission complete: {self.packets_sent} packets in {duration:.2f}s ({profile.label})")
         logger.info(f"Throughput: {stats['throughput_bps']:.2f} bps")
 
         if packet_callback:
@@ -227,9 +270,18 @@ class TemporalChannelSender:
         Returns:
             Dictionary with transmission statistics
         """
+        # Validate and initialize timing profile (fails fast if invalid or GMM not trained)
+        profile = create_timing_profile(
+            timing_profile,
+            gmm_model=gmm_model,
+            bit_0_ms=bit_0_delay * 1000.0,
+            bit_1_ms=bit_1_delay * 1000.0,
+        )
+        timing_profile_label = profile.label
+
         logger.info(f"Starting temporal channel transmission to {self.target_ip}")
         logger.info(f"Message: '{plaintext}' ({len(plaintext)} bytes)")
-        logger.info(f"Timing profile: {timing_profile}")
+        logger.info(f"Timing profile: {profile.label} ({profile.name})")
         logger.info(f"Bit 0 delay: {bit_0_delay*1000:.1f}ms, Bit 1 delay: {bit_1_delay*1000:.1f}ms")
         
         # Reset counters
@@ -249,13 +301,6 @@ class TemporalChannelSender:
         bits = bytes_to_bits(frame)
         total_packets = len(bits) + 1
         logger.info(f"Bit stream length: {len(bits)} bits")
-
-        timing_profile_label = {
-            'constant': 'Constant Delay',
-            'normal': 'Normal / Variable Load',
-            'gamma': 'Gamma Distribution',
-            'gmm': 'GMM Fitted Distribution'
-        }.get(timing_profile, timing_profile.upper())
 
         if packet_callback:
             try:
@@ -314,35 +359,8 @@ class TemporalChannelSender:
 
         # Step 5: Send timed packets for each bit in the stream
         for i, bit in enumerate(bits):
-            # Determine delay based on bit value and profile
-            if timing_profile == 'constant':
-                delay = 0.025 if bit == 0 else 0.125
-            elif timing_profile == 'normal':
-                target = 0.025 if bit == 0 else 0.125
-                jitter = float(np.random.normal(0, 0.002))
-                delay = max(0.018, min(0.040, target + jitter)) if bit == 0 else max(0.105, min(0.150, target + jitter))
-            elif timing_profile == 'gamma':
-                target = 0.025 if bit == 0 else 0.125
-                shape = 2.0
-                scale = target / shape
-                val = float(np.random.gamma(shape, scale))
-                delay = max(0.018, min(0.040, val)) if bit == 0 else max(0.105, min(0.150, val))
-            elif timing_profile == 'gmm':
-                # Modulate delay from GMM distribution conditioned on bit value (threshold = 75ms)
-                if gmm_model is not None:
-                    try:
-                        if hasattr(gmm_model, 'sample_bit_delay'):
-                            delay = gmm_model.sample_bit_delay(bit, threshold_ms=75.0)
-                        else:
-                            target = 0.025 if bit == 0 else 0.125
-                            delay = target
-                    except Exception as e:
-                        logger.warning(f"GMM sampling fallback: {e}")
-                        delay = 0.025 if bit == 0 else 0.125
-                else:
-                    delay = 0.025 if bit == 0 else 0.125
-            else:
-                delay = 0.025 if bit == 0 else 0.125
+            # Ask the selected TimingProfile for the next inter-packet delay
+            delay = profile.next_delay_s(bit=bit)
             
             # Sleep intended inter-packet delay
             time.sleep(delay)
@@ -390,8 +408,9 @@ class TemporalChannelSender:
         stats = {
             'mode': 'temporal',
             'channel_label': 'Temporal IPD',
-            'timing_profile': timing_profile,
+            'timing_profile': profile.name,
             'timing_profile_label': timing_profile_label,
+            'gmm_used': profile.name == 'gmm',
             'plaintext_length': len(plaintext),
             'encrypted_length': len(encrypted),
             'frame_size': len(frame),

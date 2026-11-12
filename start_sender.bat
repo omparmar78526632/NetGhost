@@ -1,51 +1,27 @@
 @echo off
-REM NetGhost Sender Launcher
-REM This script must be run as Administrator
+REM NetGhost Dedicated Sender Node Launcher (Port 5000)
+REM Run as Administrator for raw packet steganography
 
-echo.
-echo ========================================
-echo   NetGhost Sender Launcher
-echo ========================================
+echo ===============================================================
+echo   NETGHOST - DEDICATED SENDER NODE (PORT 5000)
+echo ===============================================================
 echo.
 
-REM Check if running as administrator
 net session >nul 2>&1
 if %errorLevel% neq 0 (
-    echo ERROR: Not running as Administrator!
+    echo [WARNING] Not running as Administrator!
+    echo Raw packet transmission requires Administrator privileges.
     echo.
-    echo Please right-click this file and select "Run as Administrator"
-    echo.
-    pause
-    exit /b 1
 )
 
-echo [OK] Running as Administrator
-echo.
-
-REM Activate virtual environment
 if exist .venv\Scripts\activate.bat (
-    call .venv\Scripts\activate.bat
-    echo [OK] Virtual environment activated
+    set "PY_EXE=.venv\Scripts\python.exe"
 ) else (
-    echo ERROR: Virtual environment not found!
-    echo Please run: python -m venv .venv
-    echo Then run: .venv\Scripts\activate
-    echo Then run: pip install -r requirements.txt
-    echo.
-    pause
-    exit /b 1
+    set "PY_EXE=python"
 )
 
-echo.
-echo Starting NetGhost Sender...
-echo.
-echo Open your browser to: http://127.0.0.1:5000
-echo.
-echo Press Ctrl+C to stop the sender
-echo.
-echo ========================================
-echo.
+echo Starting Sender Node on http://127.0.0.1:5000/sender ...
+start http://127.0.0.1:5000/sender
 
-python sender\sender_app.py
-
+%PY_EXE% sender/sender_app.py
 pause

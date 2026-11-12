@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/netghost.css">
 </head>
-<body data-default-view="receiver">
+<body data-default-view="{{ default_view or 'overview' }}" data-node-role="{{ node_role or 'unified' }}">
   <div class="app-container">
     <!-- LEFT SIDEBAR -->
     <aside class="sidebar">
@@ -31,18 +31,22 @@
       <div class="sidebar-section-label">WORKSPACE</div>
 
       <nav class="sidebar-nav">
-        <a class="nav-item" data-page="overview">
+        <a class="nav-item {% if default_view == 'overview' %}active{% endif %}" data-page="overview">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
           Overview
         </a>
-        <a class="nav-item" data-page="sender">
+        {% if node_role != 'receiver' %}
+        <a class="nav-item {% if default_view == 'sender' %}active{% endif %}" data-page="sender">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
           Sender
         </a>
-        <a class="nav-item active" data-page="receiver">
+        {% endif %}
+        {% if node_role != 'sender' %}
+        <a class="nav-item {% if default_view == 'receiver' %}active{% endif %}" data-page="receiver">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"></path><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"></path></svg>
           Receiver
         </a>
+        {% endif %}
         <a class="nav-item" data-page="profiler">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
           Traffic Profiler
@@ -86,15 +90,48 @@
       <header class="topbar">
         <div class="topbar-left">
           <button class="topbar-menu-toggle" aria-label="Toggle Menu">☰</button>
+
+          {% if node_role == 'sender' %}
+          <div class="node-badge-tag node-sender" title="Dedicated Sender Node active on Port {{ node_port or '5000' }}">
+            <span class="node-dot"></span>
+            <span class="node-label">SENDER HOST</span>
+            <span class="node-port">:{{ node_port or '5000' }}</span>
+          </div>
+          {% elif node_role == 'receiver' %}
+          <div class="node-badge-tag node-receiver" title="Dedicated Receiver Node active on Port {{ node_port or '5001' }}">
+            <span class="node-dot"></span>
+            <span class="node-label">RECEIVER HOST</span>
+            <span class="node-port">:{{ node_port or '5001' }}</span>
+          </div>
+          {% else %}
+          <div class="node-badge-tag node-unified" title="Unified Lab Console">
+            <span class="node-dot"></span>
+            <span class="node-label">LAB CONSOLE</span>
+            <span class="node-port">:{{ node_port or '5000' }}</span>
+          </div>
+          {% endif %}
+
           <div class="topbar-status">
             <span class="status-dot"></span>
-            <span class="status-bold">System ready</span>
+            <span class="status-bold">{% if node_role == 'sender' %}Sender Node Ready{% elif node_role == 'receiver' %}Receiver Sniffer Ready{% else %}System ready{% endif %}</span>
             <span style="color: var(--text-dark);">/</span>
-            <span>Lab session active</span>
+            <span>{% if node_role == 'sender' %}Ready to transmit covert data{% elif node_role == 'receiver' %}Awaiting incoming ICMP packets{% else %}Lab session active{% endif %}</span>
           </div>
         </div>
 
         <div class="topbar-right">
+          {% if peer_url %}
+          <a href="{{ peer_url }}" target="_blank" class="peer-node-btn" title="Open peer node in another window">
+            {% if node_role == 'sender' %}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path><circle cx="12" cy="12" r="2"></circle><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"></path></svg>
+              <span>Switch to Receiver (:5001) ↗</span>
+            {% else %}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              <span>Switch to Sender (:5000) ↗</span>
+            {% endif %}
+          </a>
+          {% endif %}
+
           <div class="connection-indicator">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
             <span>Connected</span>
@@ -127,7 +164,7 @@
         <!-- =================================================================
              SCREEN 1: OVERVIEW / CONTROL CENTER
              ================================================================= -->
-        <section id="view-overview" class="page-view">
+        <section id="view-overview" class="page-view {% if default_view == 'overview' %}active{% endif %}">
           <div class="page-header">
             <div>
               <div class="page-breadcrumb">
@@ -252,14 +289,18 @@
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 8px;">
+              {% if node_role != 'receiver' %}
               <button class="btn btn-primary btn-full" data-goto="sender">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                 Open Sender
               </button>
+              {% endif %}
+              {% if node_role != 'sender' %}
               <button class="btn btn-secondary btn-full" data-goto="receiver">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"></path></svg>
                 Open Receiver
               </button>
+              {% endif %}
             </div>
           </div>
 
@@ -304,10 +345,11 @@
         </section>
 
 
+        {% if node_role != 'receiver' %}
         <!-- =================================================================
              SCREEN 2: SENDER
              ================================================================= -->
-        <section id="view-sender" class="page-view">
+        <section id="view-sender" class="page-view {% if default_view == 'sender' %}active{% endif %}">
           <div class="page-header">
             <div>
               <h2 class="page-title">
@@ -329,6 +371,9 @@
             <div class="form-group">
               <label class="form-label" for="senderTargetIp">Target Address</label>
               <input type="text" id="senderTargetIp" class="form-input cell-mono" value="127.0.0.1" placeholder="127.0.0.1">
+              <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 5px;">
+                Enter destination IPv4 address (e.g. <code style="color:#38bdf8;">127.0.0.1</code>). Do not add port numbers (<code style="color:#ef4444;">:5001</code>) because ICMP operates at Network Layer 3.
+              </div>
             </div>
 
             <div class="form-group">
@@ -352,6 +397,7 @@
               <select id="senderTimingProfile" class="form-select">
                 <option value="normal" selected>Normal / Variable Load</option>
                 <option value="constant">Constant Delay</option>
+                <option value="gamma">Gamma Distribution</option>
                 <option value="gmm">GMM Fitted Distribution</option>
               </select>
             </div>
@@ -608,12 +654,14 @@
             <span>AES-256-GCM is represented here as a UI workflow stage. Full cryptographic verification is active.</span>
           </div>
         </section>
+        {% endif %}
 
 
+        {% if node_role != 'sender' %}
         <!-- =================================================================
              SCREEN 3: RECEIVER
              ================================================================= -->
-        <section id="view-receiver" class="page-view active">
+        <section id="view-receiver" class="page-view {% if default_view == 'receiver' %}active{% endif %}">
           <div class="page-header">
             <div>
               <h2 class="page-title">
@@ -931,6 +979,7 @@
             <span id="receiverAuthErrorText">Authentication failed. The recovered payload could not be verified.</span>
           </div>
         </section>
+        {% endif %}
 
 
         <!-- =================================================================
@@ -988,23 +1037,23 @@
             <div class="grid-5">
               <div>
                 <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Packets</div>
-                <div class="cell-mono" id="pcapPackets" style="font-size: 1.25rem; font-weight: 700; color: #fff;">12,480</div>
+                <div class="cell-mono" id="pcapPackets" style="font-size: 1.25rem; font-weight: 700; color: #fff;">—</div>
               </div>
               <div>
                 <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Duration</div>
-                <div class="cell-mono" id="pcapDuration" style="font-size: 1.25rem; font-weight: 700; color: #fff;">00:04:32</div>
+                <div class="cell-mono" id="pcapDuration" style="font-size: 1.25rem; font-weight: 700; color: #fff;">—</div>
               </div>
               <div>
                 <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Average IPD</div>
-                <div class="cell-mono" id="pcapAvgIpd" style="font-size: 1.25rem; font-weight: 700; color: #fff;">21.7 ms</div>
+                <div class="cell-mono" id="pcapAvgIpd" style="font-size: 1.25rem; font-weight: 700; color: #fff;">—</div>
               </div>
               <div>
                 <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Median IPD</div>
-                <div class="cell-mono" id="pcapMedianIpd" style="font-size: 1.25rem; font-weight: 700; color: #fff;">18.2 ms</div>
+                <div class="cell-mono" id="pcapMedianIpd" style="font-size: 1.25rem; font-weight: 700; color: #fff;">—</div>
               </div>
               <div>
                 <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Jitter</div>
-                <div class="cell-mono" id="pcapJitter" style="font-size: 1.25rem; font-weight: 700; color: #fff;">6.4 ms</div>
+                <div class="cell-mono" id="pcapJitter" style="font-size: 1.25rem; font-weight: 700; color: #fff;">—</div>
               </div>
             </div>
           </div>
@@ -1014,28 +1063,39 @@
             <div class="card-header">
               <div class="card-title-group">
                 <h3>GMM Model</h3>
-                <p>Statistical model for generated timing.</p>
+                <p>Statistical model for generated timing (Gianvecchio et al., 2008).</p>
               </div>
               <span style="color: var(--text-muted); font-size: 14px;">🎛</span>
             </div>
 
             <div style="background-color: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
               <span style="color: var(--text-secondary); font-size: 0.85rem;">Model Status</span>
-              <span class="metric-status-dot green"></span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="gmmStatusText" class="cell-mono" style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Checking...</span>
+                <span id="gmmStatusDot" class="metric-status-dot"></span>
+              </div>
             </div>
 
-            <div class="grid-3" style="margin-bottom: 18px;">
+            <div class="grid-5" style="margin-bottom: 18px;">
               <div>
-                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Components</div>
-                <div class="cell-mono" style="font-size: 1.2rem; font-weight: 700; color: #fff;">3</div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Samples</div>
+                <div id="gmmSamplesCount" class="cell-mono" style="font-size: 1.15rem; font-weight: 700; color: #fff;">—</div>
               </div>
               <div>
-                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Feature</div>
-                <div style="font-size: 0.9rem; font-weight: 600; color: #fff;">Packet Inter-arrival Time</div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Components</div>
+                <div id="gmmComponentsCount" class="cell-mono" style="font-size: 1.15rem; font-weight: 700; color: #fff;">—</div>
+              </div>
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Log-Likelihood</div>
+                <div id="gmmLogLikelihood" class="cell-mono" style="font-size: 1.15rem; font-weight: 700; color: #fff;">—</div>
+              </div>
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Model</div>
+                <div id="gmmLoadedBadge" class="cell-mono" style="font-size: 0.95rem; font-weight: 600; color: var(--text-muted);">Not Loaded</div>
               </div>
               <div>
                 <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Model File</div>
-                <div class="cell-mono" style="font-size: 0.88rem; color: #60a5fa;">timing_gmm.joblib</div>
+                <div id="gmmModelFile" class="cell-mono" style="font-size: 0.82rem; color: #60a5fa;">ml/models/gmm_timing.pkl</div>
               </div>
             </div>
 
@@ -1080,24 +1140,24 @@
 
             <div style="display: flex; flex-direction: column; gap: 8px;">
               <div style="background-color: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--text-muted); font-size: 0.8rem;">Mean</span>
-                <span class="cell-mono" style="font-size: 1.15rem; font-weight: 700; color: #fff;">24.6 ms</span>
+                <span style="color: var(--text-muted); font-size: 0.8rem;">Component Means (ms)</span>
+                <span id="gmmMeansVal" class="cell-mono" style="font-size: 0.95rem; font-weight: 700; color: #fff;">—</span>
               </div>
               <div style="background-color: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--text-muted); font-size: 0.8rem;">Median</span>
-                <span class="cell-mono" style="font-size: 1.15rem; font-weight: 700; color: #fff;">20.1 ms</span>
+                <span style="color: var(--text-muted); font-size: 0.8rem;">Component Variances</span>
+                <span id="gmmVariancesVal" class="cell-mono" style="font-size: 0.95rem; font-weight: 700; color: #fff;">—</span>
               </div>
               <div style="background-color: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--text-muted); font-size: 0.8rem;">Std. Deviation</span>
-                <span class="cell-mono" style="font-size: 1.15rem; font-weight: 700; color: #fff;">8.8 ms</span>
+                <span style="color: var(--text-muted); font-size: 0.8rem;">Mixture Weights</span>
+                <span id="gmmWeightsVal" class="cell-mono" style="font-size: 0.95rem; font-weight: 700; color: #fff;">—</span>
               </div>
               <div style="background-color: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--text-muted); font-size: 0.8rem;">Minimum</span>
-                <span class="cell-mono" style="font-size: 1.15rem; font-weight: 700; color: #fff;">5.0 ms</span>
+                <span style="color: var(--text-muted); font-size: 0.8rem;">BIC / AIC</span>
+                <span id="gmmBicAicVal" class="cell-mono" style="font-size: 0.95rem; font-weight: 700; color: #fff;">—</span>
               </div>
               <div style="background-color: #0e1017; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--text-muted); font-size: 0.8rem;">Maximum</span>
-                <span class="cell-mono" style="font-size: 1.15rem; font-weight: 700; color: #fff;">72.4 ms</span>
+                <span style="color: var(--text-muted); font-size: 0.8rem;">Delay Bounds (min / max)</span>
+                <span id="gmmBoundsVal" class="cell-mono" style="font-size: 0.95rem; font-weight: 700; color: #fff;">5.0 ms / 500.0 ms</span>
               </div>
             </div>
           </div>
@@ -1750,8 +1810,15 @@
               </div>
 
               <div id="doc-gmm" class="card">
-                <h4 style="font-size: 1rem; color: #fff; margin-bottom: 6px;">GMM Timing Profile</h4>
-                <p style="font-size: 0.84rem; color: var(--text-secondary);">A Gaussian Mixture Model represents multiple timing components and produces a configurable statistical profile.</p>
+                <h4 style="font-size: 1rem; color: #fff; margin-bottom: 6px;">GMM Timing Profile & Research Basis</h4>
+                <p style="font-size: 0.84rem; color: var(--text-secondary); margin-bottom: 8px;">
+                  Model-based covert timing fits a 1D Gaussian Mixture Model (EM algorithm) to baseline Inter-Packet Delays (IPD), evaluates fit using Log-Likelihood, AIC, and BIC, and samples bounded delays during transmission.
+                </p>
+                <p style="font-size: 0.8rem; color: var(--text-muted);">
+                  <strong>References:</strong><br>
+                  • Gianvecchio, S., Wang, H., Wijesekera, D., &amp; Jajodia, S. (2008). <em>"Model-Based Covert Timing Channels: Automated Modeling and Evasion."</em> RAID 2008, LNCS 5230, pp. 211–230.<br>
+                  • Cabuk, S., Brodley, C. E., &amp; Shields, C. (2004). <em>"IP Covert Timing Channels: Design and Detection."</em> ACM CCS 2004.
+                </p>
               </div>
 
               <div id="doc-framing" class="card">

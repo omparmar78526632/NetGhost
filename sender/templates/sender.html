@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/netghost.css">
 </head>
-<body data-default-view="receiver">
+<body data-default-view="{{ default_view or 'overview' }}" data-node-role="{{ node_role or 'unified' }}">
   <div class="app-container">
     <!-- LEFT SIDEBAR -->
     <aside class="sidebar">
@@ -31,18 +31,22 @@
       <div class="sidebar-section-label">WORKSPACE</div>
 
       <nav class="sidebar-nav">
-        <a class="nav-item" data-page="overview">
+        <a class="nav-item {% if default_view == 'overview' %}active{% endif %}" data-page="overview">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
           Overview
         </a>
-        <a class="nav-item" data-page="sender">
+        {% if node_role != 'receiver' %}
+        <a class="nav-item {% if default_view == 'sender' %}active{% endif %}" data-page="sender">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
           Sender
         </a>
-        <a class="nav-item active" data-page="receiver">
+        {% endif %}
+        {% if node_role != 'sender' %}
+        <a class="nav-item {% if default_view == 'receiver' %}active{% endif %}" data-page="receiver">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"></path><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"></path></svg>
           Receiver
         </a>
+        {% endif %}
         <a class="nav-item" data-page="profiler">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
           Traffic Profiler
@@ -86,15 +90,48 @@
       <header class="topbar">
         <div class="topbar-left">
           <button class="topbar-menu-toggle" aria-label="Toggle Menu">☰</button>
+
+          {% if node_role == 'sender' %}
+          <div class="node-badge-tag node-sender" title="Dedicated Sender Node active on Port {{ node_port or '5000' }}">
+            <span class="node-dot"></span>
+            <span class="node-label">SENDER HOST</span>
+            <span class="node-port">:{{ node_port or '5000' }}</span>
+          </div>
+          {% elif node_role == 'receiver' %}
+          <div class="node-badge-tag node-receiver" title="Dedicated Receiver Node active on Port {{ node_port or '5001' }}">
+            <span class="node-dot"></span>
+            <span class="node-label">RECEIVER HOST</span>
+            <span class="node-port">:{{ node_port or '5001' }}</span>
+          </div>
+          {% else %}
+          <div class="node-badge-tag node-unified" title="Unified Lab Console">
+            <span class="node-dot"></span>
+            <span class="node-label">LAB CONSOLE</span>
+            <span class="node-port">:{{ node_port or '5000' }}</span>
+          </div>
+          {% endif %}
+
           <div class="topbar-status">
             <span class="status-dot"></span>
-            <span class="status-bold">System ready</span>
+            <span class="status-bold">{% if node_role == 'sender' %}Sender Node Ready{% elif node_role == 'receiver' %}Receiver Sniffer Ready{% else %}System ready{% endif %}</span>
             <span style="color: var(--text-dark);">/</span>
-            <span>Lab session active</span>
+            <span>{% if node_role == 'sender' %}Ready to transmit covert data{% elif node_role == 'receiver' %}Awaiting incoming ICMP packets{% else %}Lab session active{% endif %}</span>
           </div>
         </div>
 
         <div class="topbar-right">
+          {% if peer_url %}
+          <a href="{{ peer_url }}" target="_blank" class="peer-node-btn" title="Open peer node in another window">
+            {% if node_role == 'sender' %}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path><circle cx="12" cy="12" r="2"></circle><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"></path></svg>
+              <span>Switch to Receiver (:5001) ↗</span>
+            {% else %}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              <span>Switch to Sender (:5000) ↗</span>
+            {% endif %}
+          </a>
+          {% endif %}
+
           <div class="connection-indicator">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
             <span>Connected</span>
@@ -127,7 +164,7 @@
         <!-- =================================================================
              SCREEN 1: OVERVIEW / CONTROL CENTER
              ================================================================= -->
-        <section id="view-overview" class="page-view">
+        <section id="view-overview" class="page-view {% if default_view == 'overview' %}active{% endif %}">
           <div class="page-header">
             <div>
               <div class="page-breadcrumb">
@@ -252,14 +289,18 @@
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 8px;">
+              {% if node_role != 'receiver' %}
               <button class="btn btn-primary btn-full" data-goto="sender">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                 Open Sender
               </button>
+              {% endif %}
+              {% if node_role != 'sender' %}
               <button class="btn btn-secondary btn-full" data-goto="receiver">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"></path></svg>
                 Open Receiver
               </button>
+              {% endif %}
             </div>
           </div>
 
@@ -304,10 +345,11 @@
         </section>
 
 
+        {% if node_role != 'receiver' %}
         <!-- =================================================================
              SCREEN 2: SENDER
              ================================================================= -->
-        <section id="view-sender" class="page-view">
+        <section id="view-sender" class="page-view {% if default_view == 'sender' %}active{% endif %}">
           <div class="page-header">
             <div>
               <h2 class="page-title">
@@ -329,6 +371,9 @@
             <div class="form-group">
               <label class="form-label" for="senderTargetIp">Target Address</label>
               <input type="text" id="senderTargetIp" class="form-input cell-mono" value="127.0.0.1" placeholder="127.0.0.1">
+              <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 5px;">
+                Enter destination IPv4 address (e.g. <code style="color:#38bdf8;">127.0.0.1</code>). Do not add port numbers (<code style="color:#ef4444;">:5001</code>) because ICMP operates at Network Layer 3.
+              </div>
             </div>
 
             <div class="form-group">
@@ -352,6 +397,7 @@
               <select id="senderTimingProfile" class="form-select">
                 <option value="normal" selected>Normal / Variable Load</option>
                 <option value="constant">Constant Delay</option>
+                <option value="gamma">Gamma Distribution</option>
                 <option value="gmm">GMM Fitted Distribution</option>
               </select>
             </div>
@@ -608,12 +654,14 @@
             <span>AES-256-GCM is represented here as a UI workflow stage. Full cryptographic verification is active.</span>
           </div>
         </section>
+        {% endif %}
 
 
+        {% if node_role != 'sender' %}
         <!-- =================================================================
              SCREEN 3: RECEIVER
              ================================================================= -->
-        <section id="view-receiver" class="page-view active">
+        <section id="view-receiver" class="page-view {% if default_view == 'receiver' %}active{% endif %}">
           <div class="page-header">
             <div>
               <h2 class="page-title">
@@ -931,6 +979,7 @@
             <span id="receiverAuthErrorText">Authentication failed. The recovered payload could not be verified.</span>
           </div>
         </section>
+        {% endif %}
 
 
         <!-- =================================================================
@@ -1938,6 +1987,69 @@
         </section>
 
       </main>
+    </div>
+  </div>
+
+  <!-- MODAL: NEW EXPERIMENT -->
+  <div class="modal-backdrop" id="modalNewExperiment">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">Create New Experiment</div>
+        <button class="modal-close-btn" id="btnCloseNewExpModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Experiment Name</label>
+          <input type="text" id="inputExperimentName" class="form-input" placeholder="e.g. DNS Telemetry Steg Evaluation">
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Channel</label>
+            <select id="selectExperimentChannel" class="form-select">
+              <option value="header" selected>IP-ID Header Embedding</option>
+              <option value="temporal">Temporal IPD</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Timing Profile</label>
+            <select id="selectExperimentProfile" class="form-select">
+              <option value="Normal" selected>Normal</option>
+              <option value="GMM Fitted Distribution">GMM Fitted Distribution</option>
+              <option value="Constant">Constant</option>
+              <option value="Gamma">Gamma</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Target Destination IP</label>
+          <input type="text" id="inputExperimentTarget" class="form-input cell-mono" value="127.0.0.1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Payload Content</label>
+          <textarea id="inputExperimentPayload" class="form-textarea cell-mono" rows="3" placeholder="Enter message payload to test..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnCancelNewExp">Cancel</button>
+        <button class="btn btn-primary" id="btnSubmitNewExp">Create & Register</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: VIEW EXPERIMENT DETAILS -->
+  <div class="modal-backdrop" id="modalViewExperiment">
+    <div class="modal-card" style="max-width: 640px;">
+      <div class="modal-header">
+        <div class="modal-title" id="viewExpTitle">Experiment Details</div>
+        <button class="modal-close-btn" id="btnCloseViewExpModal">&times;</button>
+      </div>
+      <div class="modal-body" id="viewExpBody">
+        <!-- Dynamic content injected here -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnCloseViewExp">Close</button>
+        <button class="btn btn-primary" id="btnRunExpAgain">▶ Run Experiment Again</button>
+      </div>
     </div>
   </div>
 

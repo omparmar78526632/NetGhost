@@ -35,6 +35,7 @@ if sys.platform == 'win32':
 from common.crypto import encrypt_message, decrypt_message, derive_key, SALT_SIZE, GCM_NONCE_SIZE
 from common.framing import create_frame, parse_frame, SYNC_MARKER, HEADER_SIZE
 from common.utils import uint16_list_to_bytes, bytes_to_uint16_list, bytes_to_bits, bits_to_bytes
+from common.timing import VALID_TIMING_PROFILES
 from sender.sender_core import HeaderChannelSender, TemporalChannelSender
 from receiver.receiver_core import HeaderChannelReceiver, TemporalChannelReceiver, resolve_sniff_interfaces
 from ml.ml_profiler import TrafficProfiler
@@ -60,6 +61,9 @@ current_receiver = None
 status_queue = queue.Queue()
 message_queue = queue.Queue()
 gmm_model = None
+gmm_status_state = 'Not Trained'  # Not Trained, Training, Trained, Failed
+gmm_last_error = None
+GMM_MODEL_REL_PATH = os.path.join('ml', 'models', 'gmm_timing.pkl')
 
 sse_subscribers = []
 sse_lock = threading.Lock()
@@ -117,18 +121,24 @@ def broadcast_sse_event(event_data: dict):
 # Initialize GMM Model
 def load_gmm_model():
     """Load pre-trained GMM model if available"""
-    global gmm_model
-    model_path = os.path.join(BASE_DIR, 'ml', 'models', 'gmm_timing.pkl')
+    global gmm_model, gmm_status_state, gmm_last_error
+    model_path = os.path.join(BASE_DIR, GMM_MODEL_REL_PATH)
     if os.path.exists(model_path):
         try:
             profiler = TrafficProfiler()
             profiler.load_model(model_path)
             gmm_model = profiler
+            gmm_status_state = 'Trained'
+            gmm_last_error = None
             log_audit_event('GMM_INIT', f'GMM Timing Model loaded from {model_path}', 'SUCCESS')
             return True
         except Exception as e:
+            gmm_model = None
+            gmm_status_state = 'Failed'
+            gmm_last_error = str(e)
             log_audit_event('GMM_INIT', f'Failed to load GMM model: {e}', 'WARNING')
             return False
+    gmm_status_state = 'Not Trained'
     return False
 
 
@@ -452,9 +462,55 @@ def message_callback(message: str):
 # ==============================================================================
 @app.route('/')
 def index():
-    """Render unified 9-screen NetGhost console"""
+    """Render NetGhost console, defaulting to node role if running standalone"""
     gmm_available = gmm_model is not None
-    return render_template('index.html', gmm_available=gmm_available)
+    node_role = os.environ.get('NETGHOST_MODE', 'unified')
+    host_port = request.host.split(':')[-1] if ':' in request.host else ('5001' if node_role == 'receiver' else '5000')
+    node_port = os.environ.get('NETGHOST_PORT', host_port)
+    default_view = 'sender' if node_role == 'sender' else ('receiver' if node_role == 'receiver' else 'overview')
+    peer_url = "http://127.0.0.1:5001/receiver" if node_role == 'sender' else ("http://127.0.0.1:5000/sender" if node_role == 'receiver' else None)
+    return render_template(
+        'index.html',
+        gmm_available=gmm_available,
+        default_view=default_view,
+        node_role=node_role,
+        node_port=node_port,
+        peer_url=peer_url
+    )
+
+
+@app.route('/sender')
+def sender_page():
+    """Dedicated Sender View on http://<host>:<port>/sender"""
+    gmm_available = gmm_model is not None
+    host_port = request.host.split(':')[-1] if ':' in request.host else '5000'
+    node_role = 'sender'
+    peer_url = "http://127.0.0.1:5001/receiver"
+    return render_template(
+        'index.html',
+        gmm_available=gmm_available,
+        default_view='sender',
+        node_role=node_role,
+        node_port=host_port,
+        peer_url=peer_url
+    )
+
+
+@app.route('/receiver')
+def receiver_page():
+    """Dedicated Receiver View on http://<host>:<port>/receiver"""
+    gmm_available = gmm_model is not None
+    host_port = request.host.split(':')[-1] if ':' in request.host else '5001'
+    node_role = 'receiver'
+    peer_url = "http://127.0.0.1:5000/sender"
+    return render_template(
+        'index.html',
+        gmm_available=gmm_available,
+        default_view='receiver',
+        node_role=node_role,
+        node_port=host_port,
+        peer_url=peer_url
+    )
 
 
 @app.route('/api/overview')
@@ -589,10 +645,18 @@ def send_message():
     """Handle covert message transmission"""
     try:
         data = request.get_json(silent=True) or {}
-        target_ip = data.get('target_ip', '127.0.0.1').strip()
+        raw_target = data.get('target_ip', '127.0.0.1').strip()
+        # Sanitize target IP: ICMP operates at Layer 3 (IP), so strip any Layer 4 ports (e.g. :5001) or URL schemes
+        clean_target = raw_target.replace('http://', '').replace('https://', '').strip()
+        if ':' in clean_target:
+            clean_target = clean_target.split(':')[0].strip()
+        target_ip = clean_target or '127.0.0.1'
+        
         passphrase = data.get('passphrase', '').strip()
         message = data.get('message', '')
         mode = data.get('mode', 'header')
+        timing_profile = (data.get('timing_profile') or 'normal').strip().lower()
+        delay_ms = float(data.get('delay_ms', 50.0))
         
         if not target_ip:
             return jsonify({'error': 'Destination Target IP address is required'}), 400
@@ -600,6 +664,16 @@ def send_message():
             return jsonify({'error': 'Shared Secret Passphrase is required'}), 400
         if not message:
             return jsonify({'error': 'Plaintext Message payload cannot be empty'}), 400
+        if timing_profile not in VALID_TIMING_PROFILES:
+            return jsonify({'error': f"Invalid timing profile '{timing_profile}'. Must be one of: {', '.join(VALID_TIMING_PROFILES)}"}), 400
+
+        if timing_profile == 'gmm':
+            if not gmm_model or not gmm_model.is_trained():
+                load_gmm_model()
+            if not gmm_model or not gmm_model.is_trained():
+                return jsonify({
+                    'error': 'GMM model is not trained or loaded. Please train or load a GMM model in Traffic Profiler first.'
+                }), 400
         
         system_state['status'] = 'TRANSMITTING'
         system_state['active_channel'] = 'IP-ID Header Embedding' if mode == 'header' else 'Temporal IPD'
@@ -609,24 +683,27 @@ def send_message():
         
         if mode == 'header':
             sender = HeaderChannelSender(target_ip)
-            stats = sender.send_message(message, passphrase, packet_callback=broadcast_sse_event)
+            stats = sender.send_message(
+                message,
+                passphrase,
+                packet_callback=broadcast_sse_event,
+                timing_profile=timing_profile,
+                gmm_model=gmm_model if timing_profile == 'gmm' else None,
+                delay_ms=delay_ms,
+            )
             system_state['total_packets_sent'] += stats['packets_sent']
             system_state['total_bytes_sent'] += stats['frame_size']
             system_state['last_tx_time'] = time.time()
             system_state['status'] = 'COMPLETED'
-            log_audit_event('TX_HEADER', f"Sent {stats['packets_sent']} packets ({stats['frame_size']}B) to {target_ip}", 'SUCCESS')
+            log_audit_event('TX_HEADER', f"Sent {stats['packets_sent']} packets ({stats['frame_size']}B, {stats['timing_profile_label']}) to {target_ip}", 'SUCCESS')
             return jsonify({'success': True, 'stats': stats})
         
         elif mode == 'temporal':
-            bit_0_delay = float(data.get('bit_0_delay', 20)) / 1000.0
+            bit_0_delay = float(data.get('bit_0_delay', 25)) / 1000.0
             bit_1_delay = float(data.get('bit_1_delay', 125)) / 1000.0
-            timing_profile = data.get('timing_profile', 'normal')
+            model = gmm_model if timing_profile == 'gmm' else None
             
             sender = TemporalChannelSender(target_ip)
-            if timing_profile == 'gmm' and not gmm_model:
-                load_gmm_model()
-            model = gmm_model if timing_profile == 'gmm' and gmm_model else None
-            
             stats = sender.send_message(
                 message,
                 passphrase,
@@ -766,30 +843,90 @@ def stream():
 # ==============================================================================
 @app.route('/gmm_status')
 def gmm_status():
-    """Check GMM model status"""
-    if gmm_model:
+    """Check GMM model status and validation metrics"""
+    is_loaded = bool(gmm_model and gmm_model.is_trained())
+    model_path = os.path.join(BASE_DIR, GMM_MODEL_REL_PATH)
+    if is_loaded:
         stats = gmm_model.get_statistics()
-        return jsonify({'available': True, 'statistics': stats})
-    else:
-        return jsonify({'available': False})
+        return jsonify({
+            'available': True,
+            'loaded': True,
+            'status': 'Trained',
+            'model_file': GMM_MODEL_REL_PATH,
+            'model_exists_on_disk': os.path.exists(model_path),
+            'error': None,
+            'statistics': stats
+        })
+    return jsonify({
+        'available': False,
+        'loaded': False,
+        'status': gmm_status_state,
+        'model_file': GMM_MODEL_REL_PATH,
+        'model_exists_on_disk': os.path.exists(model_path),
+        'error': gmm_last_error,
+        'statistics': None
+    })
+
+
+@app.route('/api/profiler/load', methods=['POST'])
+def api_load_gmm():
+    """Explicitly load saved GMM model from disk"""
+    global gmm_model, gmm_status_state, gmm_last_error
+    model_path = os.path.join(BASE_DIR, GMM_MODEL_REL_PATH)
+    if not os.path.exists(model_path):
+        gmm_status_state = 'Not Trained'
+        gmm_last_error = f"Model file not found: {GMM_MODEL_REL_PATH}"
+        return jsonify({'success': False, 'status': 'Not Trained', 'loaded': False, 'error': gmm_last_error}), 404
+    try:
+        profiler = TrafficProfiler()
+        profiler.load_model(model_path)
+        gmm_model = profiler
+        gmm_status_state = 'Trained'
+        gmm_last_error = None
+        stats = profiler.get_statistics()
+        log_audit_event('GMM_LOAD', f"Loaded GMM model from {GMM_MODEL_REL_PATH}", 'SUCCESS')
+        return jsonify({
+            'success': True,
+            'status': 'Trained',
+            'loaded': True,
+            'model_file': GMM_MODEL_REL_PATH,
+            'statistics': stats
+        })
+    except Exception as e:
+        gmm_model = None
+        gmm_status_state = 'Failed'
+        gmm_last_error = str(e)
+        return jsonify({'success': False, 'status': 'Failed', 'loaded': False, 'error': str(e)}), 500
 
 
 def _build_profiler_response(delays: list, filename: str, n_components: int = 3):
-    """Helper to fit GMM, compute metrics, histogram, and save model"""
-    global gmm_model
-    arr = np.array(delays, dtype=float)
-    arr = arr[arr > 0]
-    if len(arr) < 10:
-        raise ValueError("Need at least 10 valid packet delay samples to train GMM model.")
+    """Helper to fit GMM, compute validation metrics, histogram, and save model"""
+    global gmm_model, gmm_status_state, gmm_last_error
+    gmm_status_state = 'Training'
+    try:
+        arr = np.array(delays, dtype=float)
+        arr = arr[np.isfinite(arr) & (arr > 0)]
+        if len(arr) < 10:
+            raise ValueError("Need at least 10 valid packet delay samples to train GMM model.")
 
-    profiler = TrafficProfiler(n_components=n_components)
-    cleaned = profiler.clean_timing_data(arr)
-    profiler.train_gmm(cleaned)
+        profiler = TrafficProfiler(n_components=n_components)
+        cleaned = profiler.clean_timing_data(arr)
+        if len(cleaned) < 10:
+            raise ValueError("Insufficient samples remaining after outlier cleaning (need at least 10).")
 
-    model_path = os.path.join(BASE_DIR, 'ml', 'models', 'gmm_timing.pkl')
-    os.makedirs(os.path.dirname(model_path), exist_ok=True)
-    profiler.save_model(model_path)
-    gmm_model = profiler
+        profiler.train_gmm(cleaned, dataset_source=filename)
+
+        model_path = os.path.join(BASE_DIR, GMM_MODEL_REL_PATH)
+        os.makedirs(os.path.dirname(model_path), exist_ok=True)
+        profiler.save_model(model_path)
+        gmm_model = profiler
+        gmm_status_state = 'Trained'
+        gmm_last_error = None
+    except Exception as e:
+        gmm_status_state = 'Failed'
+        gmm_last_error = str(e)
+        log_audit_event('PROFILER_FAIL', f"GMM training failed on {filename}: {e}", 'ERROR')
+        raise
 
     # Compute statistics
     total_duration_sec = np.sum(arr) / 1000.0
@@ -825,17 +962,28 @@ def _build_profiler_response(delays: list, filename: str, n_components: int = 3)
             'variance': round(float(stats['variances'][i]), 2)
         })
 
-    log_audit_event('PROFILER_TRAIN', f"GMM trained on {filename} ({len(arr)} pkts, K={n_components})", 'SUCCESS')
+    log_audit_event(
+        'PROFILER_TRAIN',
+        f"GMM trained on {filename} ({stats.get('n_samples', len(cleaned))} samples, K={n_components}, LL={stats.get('log_likelihood')})",
+        'SUCCESS'
+    )
 
     return {
         'success': True,
+        'status': 'Trained',
+        'loaded': True,
+        'model_file': GMM_MODEL_REL_PATH,
         'filename': filename,
         'packets': int(len(arr) + 1),
+        'n_samples': int(stats.get('n_samples', len(cleaned))),
         'duration': duration_str,
         'avg_ipd': f"{avg_ipd:.1f} ms",
         'median_ipd': f"{median_ipd:.1f} ms",
         'jitter': f"{jitter:.1f} ms",
         'components': n_components,
+        'log_likelihood': stats.get('log_likelihood'),
+        'aic': stats.get('aic'),
+        'bic': stats.get('bic'),
         'component_details': comp_details,
         'stats': stats,
         'raw_delays_sample': [round(float(x), 1) for x in cleaned[:100]],

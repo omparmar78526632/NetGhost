@@ -1820,16 +1820,75 @@ body.light-theme .theme-toggle-thumb {
   text-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
 }
 
-/* Reduced Motion Override */
-@media (prefers-reduced-motion: reduce) {
-  .flow-pipeline-container.transmitting .flow-link-particle,
-  .flow-pipeline-container.receiving .flow-link-particle,
-  .flow-status-text.transmitting,
-  .ng-packet-card,
-  .flow-temporal-node {
-    animation: none !important;
-    transition: none !important;
-  }
+/* ==========================================================================
+   MULTI-NODE HOST BADGES & PEER BUTTONS
+   ========================================================================== */
+.node-badge-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.76rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 4px 11px;
+  border-radius: var(--radius-full);
+  margin-right: 12px;
+  user-select: none;
+}
+.node-badge-tag.node-sender {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.18);
+}
+.node-badge-tag.node-receiver {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.18);
+}
+.node-badge-tag.node-unified {
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
+.node-badge-tag .node-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+  animation: pulse-node 2s infinite ease-in-out;
+}
+@keyframes pulse-node {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.85); }
+}
+
+.peer-node-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  text-decoration: none;
+  transition: var(--transition);
+}
+.peer-node-btn:hover {
+  border-color: #38bdf8;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+  transform: translateY(-1px);
+}
+.peer-node-btn svg {
+  flex-shrink: 0;
 }
 
 

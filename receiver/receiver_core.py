@@ -4,6 +4,8 @@ Implements packet sniffing and decoding for both covert channels
 """
 
 import time
+import hashlib
+import struct
 import logging
 import threading
 import sys
@@ -79,6 +81,16 @@ class HeaderChannelReceiver:
         self.decryption_success = False
         self.last_message = None
         self.last_error = None
+        self._seq_chunks = {}
+        self._seen_icmp_seqs = set()
+        self._last_sync_time = 0.0
+        self._last_ip_id = None
+        self._last_icmp_seq = None
+        self._seq_chunks = {}
+        self._seen_icmp_seqs = set()
+        self._last_sync_time = 0.0
+        self._last_ip_id = None
+        self._last_icmp_seq = None
         self.status_callback = None
         self.event_callback = None
         self.message_callback = None
@@ -148,14 +160,45 @@ class HeaderChannelReceiver:
         if packet.haslayer(ICMP) and packet.haslayer(IP):
             if packet[ICMP].type == 8:  # Echo Request
                 curr_time = float(getattr(packet, 'time', None) or time.time())
-                # Deduplicate Npcap multi-adapter / loopback double capture (<3ms)
-                if self.timestamps and (curr_time - self.timestamps[-1]) < 0.003:
+                ip_id = packet[IP].id
+                icmp_seq = int(getattr(packet[ICMP], 'seq', 0) or 0)
+
+                # Deduplicate Npcap multi-adapter / loopback double capture (<3ms) ONLY if same (ip_id, seq)
+                if (
+                    self.timestamps
+                    and (curr_time - self.timestamps[-1]) < 0.003
+                    and ip_id == self._last_ip_id
+                    and icmp_seq == self._last_icmp_seq
+                ):
                     return
-                
+
+                # Deduplicate identical (seq, ip_id) captures in active sequence-numbered session
+                if icmp_seq > 0 and icmp_seq in self._seen_icmp_seqs and self._seq_chunks.get(icmp_seq) == ip_id:
+                    return
+
+                # Session boundary: new 0xDEAD sync packet with seq=0 starts a fresh frame
+                if ip_id == 0xDEAD and icmp_seq == 0:
+                    if self._last_sync_time and (curr_time - self._last_sync_time) < 0.05:
+                        return
+                    self._last_sync_time = curr_time
+                    self.uint16_values = []
+                    self.bits = []
+                    self.timestamps = []
+                    self._seq_chunks = {0: ip_id}
+                    self._seen_icmp_seqs = {0}
+                    self.frame_extracted = False
+                    self.decryption_success = False
+                    self.last_error = None
+                elif self.sync_detected and 0 in self._seen_icmp_seqs and icmp_seq > 0:
+                    self._seen_icmp_seqs.add(icmp_seq)
+                    self._seq_chunks[icmp_seq] = ip_id
+
+                self._last_ip_id = ip_id
+                self._last_icmp_seq = icmp_seq
                 self.icmp_packets += 1
                 self.timestamps.append(curr_time)
-                ip_id = packet[IP].id
                 self.uint16_values.append(ip_id)
+                logger.debug(f"RECEIVE: fragment_index={icmp_seq} ip_id=0x{ip_id:04X} ({ip_id})")
                 
                 is_sync = ip_id == 0xDEAD
                 if is_sync:
@@ -268,10 +311,29 @@ class HeaderChannelReceiver:
                 self.sync_detected = True
                 continue
             
-            # Extract complete frame
+            # Extract complete frame (prefer sequence-numbered order when available)
             self.sync_detected = True
-            payload_chunks = self.uint16_values[sync_idx + 2 : total_needed]
+            seq_ready = (
+                0 in self._seq_chunks
+                and 1 in self._seq_chunks
+                and all(k in self._seq_chunks for k in range(2, 2 + needed_chunks))
+            )
+            if seq_ready:
+                payload_chunks = [self._seq_chunks[k] for k in range(2, 2 + needed_chunks)]
+            else:
+                payload_chunks = self.uint16_values[sync_idx + 2 : total_needed]
             payload_bytes = uint16_list_to_bytes(payload_chunks)[:payload_len]
+            full_frame = struct.pack('>HH', 0xDEAD, payload_len) + payload_bytes
+            frame_hash = hashlib.sha256(full_frame).hexdigest()[:16]
+            nonce_hex = payload_bytes[16:28].hex() if len(payload_bytes) >= 28 else ""
+            ct_len = max(0, len(payload_bytes) - 16 - 12 - 16)
+            logger.info(
+                f"Receiver reassembled frame: packets_rx={self.packets_received}, "
+                f"icmp_rx={self.icmp_packets}, fragments={needed_chunks}, "
+                f"frame_len={len(full_frame)}B, payload_len={len(payload_bytes)}B, "
+                f"ct_len={ct_len}B, nonce_len=12B, tag_len=16B, "
+                f"frame_hash={frame_hash}, nonce={nonce_hex}"
+            )
             
             self.frame_extracted = True
             self._emit_event({
@@ -308,10 +370,13 @@ class HeaderChannelReceiver:
                 self.uint16_values = []
                 self.bits = []
                 self.timestamps = []
+                self._seq_chunks = {}
+                self._seen_icmp_seqs = set()
                 return True
             except ValueError as e:
                 self.decryption_success = False
                 self.last_error = str(e)
+                logger.warning(f"Receiver auth FAILED: frame_hash={frame_hash}, error={e}")
                 self._emit_event({
                     'type': 'rx_auth_status',
                     'auth': 'FAILED',
@@ -320,6 +385,8 @@ class HeaderChannelReceiver:
                 })
                 self._update_status(f"✗ Decryption failed: Check if passphrase matches sender! ({str(e)})")
                 self.uint16_values = self.uint16_values[sync_idx + 1:]
+                self._seq_chunks = {}
+                self._seen_icmp_seqs = set()
                 return False
         
         return False
@@ -449,6 +516,16 @@ class HeaderChannelReceiver:
         self.decryption_success = False
         self.last_message = None
         self.last_error = None
+        self._seq_chunks = {}
+        self._seen_icmp_seqs = set()
+        self._last_sync_time = 0.0
+        self._last_ip_id = None
+        self._last_icmp_seq = None
+        self._seq_chunks = {}
+        self._seen_icmp_seqs = set()
+        self._last_sync_time = 0.0
+        self._last_ip_id = None
+        self._last_icmp_seq = None
         
         target_iface = resolve_sniff_interfaces(interface)
         self._update_status(f"Starting receiver (Auto-Detect Header & Temporal)...")
@@ -473,6 +550,8 @@ class HeaderChannelReceiver:
                     store=False
                 )
             except Exception as e:
+                self.last_error = str(e)
+                self._emit_event({'type': 'rx_error', 'error': str(e), 'timestamp': time.time()})
                 self._update_status(f"Error: {str(e)}")
             finally:
                 self.running = False
@@ -517,6 +596,16 @@ class TemporalChannelReceiver:
         self.decryption_success = False
         self.last_message = None
         self.last_error = None
+        self._seq_chunks = {}
+        self._seen_icmp_seqs = set()
+        self._last_sync_time = 0.0
+        self._last_ip_id = None
+        self._last_icmp_seq = None
+        self._seq_chunks = {}
+        self._seen_icmp_seqs = set()
+        self._last_sync_time = 0.0
+        self._last_ip_id = None
+        self._last_icmp_seq = None
         self.status_callback = None
         self.event_callback = None
         self.message_callback = None
@@ -779,6 +868,16 @@ class TemporalChannelReceiver:
         self.decryption_success = False
         self.last_message = None
         self.last_error = None
+        self._seq_chunks = {}
+        self._seen_icmp_seqs = set()
+        self._last_sync_time = 0.0
+        self._last_ip_id = None
+        self._last_icmp_seq = None
+        self._seq_chunks = {}
+        self._seen_icmp_seqs = set()
+        self._last_sync_time = 0.0
+        self._last_ip_id = None
+        self._last_icmp_seq = None
         
         target_iface = resolve_sniff_interfaces(interface)
         self._update_status(f"Starting temporal channel receiver...")
@@ -804,6 +903,8 @@ class TemporalChannelReceiver:
                     store=False
                 )
             except Exception as e:
+                self.last_error = str(e)
+                self._emit_event({'type': 'rx_error', 'error': str(e), 'timestamp': time.time()})
                 self._update_status(f"Error: {str(e)}")
             finally:
                 self.running = False

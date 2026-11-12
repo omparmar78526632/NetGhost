@@ -790,8 +790,12 @@ Organizations should be aware of covert channel risks:
    - Wendzel, S., et al. "Hidden and Uncontrolled—On the Emergence of Network Steganographic Threats" (2014)
    - Zander, S., et al. "A survey of covert channels and countermeasures in computer network protocols" (2007)
 
-2. **Covert Timing Channels**
-   - Cabuk, S., et al. "IP covert timing channels: design and detection" (2004)
+2. **Covert Timing Channels & Research Methodology**
+   - Gianvecchio, S., Wang, H., Wijesekera, D., & Jajodia, S. (2008). *"Model-Based Covert Timing Channels: Automated Modeling and Evasion."* Recent Advances in Intrusion Detection (RAID 2008), LNCS 5230, pp. 211–230.
+     - **Adopted Concept**: Model-based IPD distribution fitting using a statistical mixture model learned from legitimate baseline network traffic, and sampling bounded inter-packet delays from the fitted distribution to mimic normal traffic statistics.
+     - **Implementation & Adaptation in NetGhost**: Fits a 1D Gaussian Mixture Model (EM algorithm) to millisecond IPDs (`ml/ml_profiler.py`), evaluates fit via Log-Likelihood / AIC / BIC, and samples bounded delays (`[5.0, 500.0] ms`) via `GMMTimingProfile` (`common/timing.py`) for both IP-ID header packet pacing and component-conditioned temporal IPD modulation. Does not implement the full inverse-CDF transform or Markov renewal chain from the original paper.
+   - Cabuk, S., Brodley, C. E., & Shields, C. (2004). *"IP covert timing channels: design and detection."* Proceedings of the 11th ACM Conference on Computer and Communications Security (CCS '04).
+     - **Adopted Concept**: Baseline constant-interval and variable-load timing channels for comparison against model-based timing.
    - Shah, G., et al. "Keyboards and covert channels" (2006)
 
 3. **Cryptography**

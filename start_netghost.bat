@@ -1,14 +1,13 @@
 @echo off
-REM NetGhost Unified Console Launcher
+REM NetGhost Master Launcher
 REM Run as Administrator for raw packet steganography
 
 echo.
-echo =======================================================
-echo   NETGHOST - Unified Network Steganography Console
-echo =======================================================
+echo ===============================================================
+echo   NETGHOST - NETWORK STEGANOGRAPHY LABORATORY
+echo ===============================================================
 echo.
 
-REM Check if running as administrator
 net session >nul 2>&1
 if %errorLevel% neq 0 (
     echo [WARNING] Not running as Administrator!
@@ -16,19 +15,53 @@ if %errorLevel% neq 0 (
     echo.
 )
 
-REM Activate virtual environment
 if exist .venv\Scripts\activate.bat (
     call .venv\Scripts\activate.bat
+    set "PY_EXE=.venv\Scripts\python.exe"
 ) else (
-    echo Virtual environment not found. Using system Python.
+    set "PY_EXE=python"
 )
 
-echo Starting NetGhost Unified Laboratory Console...
-echo Opening browser: http://127.0.0.1:5000
+echo Please choose an execution mode:
+echo.
+echo   [1] Dual Nodes (Recommended)
+echo       - Sender on http://127.0.0.1:5000/sender
+echo       - Receiver on http://127.0.0.1:5001/receiver
+echo.
+echo   [2] Dedicated Sender Node Only (Port 5000)
+echo   [3] Dedicated Receiver Node Only (Port 5001)
+echo   [4] Unified Lab Console (Port 5000)
 echo.
 
+set /p choice="Enter choice (1-4) [default: 1]: "
+
+if "%choice%"=="2" goto opt_sender
+if "%choice%"=="3" goto opt_receiver
+if "%choice%"=="4" goto opt_unified
+goto opt_dual
+
+:opt_dual
+echo.
+echo Launching Dual Nodes...
+call start_dual_nodes.bat
+exit /b
+
+:opt_sender
+echo.
+echo Launching Dedicated Sender Node...
+call start_sender.bat
+exit /b
+
+:opt_receiver
+echo.
+echo Launching Dedicated Receiver Node...
+call start_receiver.bat
+exit /b
+
+:opt_unified
+echo.
+echo Starting Unified Console on http://127.0.0.1:5000 ...
 start http://127.0.0.1:5000
-
-python app.py
-
+%PY_EXE% app.py
 pause
+exit /b

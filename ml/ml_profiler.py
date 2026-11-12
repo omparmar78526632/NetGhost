@@ -1,12 +1,22 @@
 """
 Machine Learning Traffic Profiler
-Uses Gaussian Mixture Models to model network timing patterns
+Uses Gaussian Mixture Models (GMM) to model legitimate network Inter-Packet Delays (IPD).
+
+Research Basis:
+    Gianvecchio, S., Wang, H., Wijesekera, D., & Jajodia, S. (2008).
+    "Model-Based Covert Timing Channels: Automated Modeling and Evasion."
+    Recent Advances in Intrusion Detection (RAID 2008), LNCS 5230, pp. 211-230.
+
+    Adapted for NetGhost: fits a 1D Gaussian Mixture Model via Expectation-Maximization
+    on baseline IPD samples (ms), evaluates fit via log-likelihood / AIC / BIC, and
+    samples bounded realistic delays during covert ICMP transmission.
 """
 
 import os
+import datetime
 import logging
 import numpy as np
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional, Dict, Any
 from sklearn.mixture import GaussianMixture
 import joblib
 
@@ -25,17 +35,31 @@ class TrafficProfiler:
     Models inter-arrival times from network traffic.
     """
     
-    def __init__(self, n_components: int = 3):
+    def __init__(
+        self,
+        n_components: int = 3,
+        min_bound_ms: float = 5.0,
+        max_bound_ms: float = 500.0
+    ):
         """
         Initialize traffic profiler.
         
         Args:
             n_components: Number of Gaussian components in mixture
+            min_bound_ms: Minimum allowed sampled delay (ms)
+            max_bound_ms: Maximum allowed sampled delay (ms)
         """
         self.n_components = n_components
+        self.min_bound_ms = float(min_bound_ms)
+        self.max_bound_ms = float(max_bound_ms)
         self.gmm = None
         self.training_data = None
+        self.dataset_source = "unknown"
         self.statistics = {}
+
+    def is_trained(self) -> bool:
+        """Return True if a fitted GMM model is loaded and ready."""
+        return self.gmm is not None and hasattr(self.gmm, "means_")
     
     def extract_timing_from_pcap(self, pcap_file: str) -> np.ndarray:
         """
@@ -82,7 +106,7 @@ class TrafficProfiler:
         max_val: float = 1000.0
     ) -> np.ndarray:
         """
-        Clean timing data by removing outliers.
+        Clean timing data by removing non-finite values and outliers.
         
         Args:
             timing_data: Raw inter-arrival times
@@ -93,6 +117,8 @@ class TrafficProfiler:
             Cleaned timing data
         """
         timing_arr = np.asarray(timing_data, dtype=float)
+        finite_mask = np.isfinite(timing_arr)
+        timing_arr = timing_arr[finite_mask]
         cleaned = timing_arr[(timing_arr >= min_val) & (timing_arr <= max_val)]
         logger.info(f"Cleaned data: {len(cleaned)}/{len(timing_arr)} samples retained")
         return cleaned
@@ -100,57 +126,85 @@ class TrafficProfiler:
     def train_gmm(
         self,
         timing_data: np.ndarray,
-        n_components: Optional[int] = None
+        n_components: Optional[int] = None,
+        dataset_source: Optional[str] = None
     ) -> GaussianMixture:
         """
-        Train Gaussian Mixture Model on timing data.
+        Validate samples and train Gaussian Mixture Model on timing data.
         
         Args:
             timing_data: Inter-arrival times in milliseconds
             n_components: Number of components (overrides init value if provided)
+            dataset_source: Optional label describing the dataset origin
         
         Returns:
             Trained GMM model
         """
         if n_components is not None:
-            self.n_components = n_components
-        
-        logger.info(f"Training GMM with {self.n_components} components...")
+            self.n_components = int(n_components)
+        if dataset_source is not None:
+            self.dataset_source = dataset_source
+
+        arr = np.asarray(timing_data, dtype=float)
+        arr = arr[np.isfinite(arr) & (arr > 0)]
+        if len(arr) < 10:
+            raise ValueError(f"Insufficient valid IPD samples ({len(arr)}). Need at least 10 positive finite samples.")
+        if self.n_components < 1:
+            raise ValueError(f"n_components must be >= 1, got {self.n_components}")
+        if self.n_components > len(arr):
+            raise ValueError(f"n_components ({self.n_components}) cannot exceed sample count ({len(arr)})")
+
+        logger.info(f"Training GMM with {self.n_components} components on {len(arr)} samples...")
         
         # Reshape for sklearn
-        X = timing_data.reshape(-1, 1)
+        X = arr.reshape(-1, 1)
         self.training_data = X
         
-        # Train GMM
+        # Train GMM using Expectation-Maximization
         self.gmm = GaussianMixture(
             n_components=self.n_components,
             covariance_type='full',
             random_state=42,
-            max_iter=100
+            max_iter=200,
+            reg_covar=1e-4
         )
         
         self.gmm.fit(X)
         
-        # Compute statistics
-        self._compute_statistics()
+        # Compute statistics and validation metrics
+        self._compute_statistics(X)
         
         logger.info("GMM training complete")
         self._log_statistics()
         
         return self.gmm
     
-    def _compute_statistics(self):
-        """Compute statistics from trained GMM"""
+    def _compute_statistics(self, X: Optional[np.ndarray] = None):
+        """Compute parameters and validation metrics from trained GMM."""
         if self.gmm is None:
             return
-        
+
+        data = X if X is not None else self.training_data
+        n_samples = int(len(data)) if data is not None else self.statistics.get('n_samples', 0)
+        log_likelihood = float(self.gmm.score(data)) if data is not None else self.statistics.get('log_likelihood')
+        aic = float(self.gmm.aic(data)) if data is not None else self.statistics.get('aic')
+        bic = float(self.gmm.bic(data)) if data is not None else self.statistics.get('bic')
+
         self.statistics = {
-            'n_components': self.n_components,
+            'n_samples': n_samples,
+            'n_components': int(self.n_components),
             'means': self.gmm.means_.flatten().tolist(),
             'variances': self.gmm.covariances_.flatten().tolist(),
             'weights': self.gmm.weights_.tolist(),
-            'converged': self.gmm.converged_,
-            'n_iter': self.gmm.n_iter_
+            'converged': bool(self.gmm.converged_),
+            'n_iter': int(self.gmm.n_iter_),
+            'log_likelihood': round(log_likelihood, 4) if log_likelihood is not None else None,
+            'aic': round(aic, 2) if aic is not None else None,
+            'bic': round(bic, 2) if bic is not None else None,
+            'min_bound_ms': self.min_bound_ms,
+            'max_bound_ms': self.max_bound_ms,
+            'dataset_source': self.dataset_source,
+            'trained_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
     
     def _log_statistics(self):
@@ -159,9 +213,11 @@ class TrafficProfiler:
             return
         
         logger.info("GMM Statistics:")
+        logger.info(f"  Samples: {self.statistics.get('n_samples', 'N/A')}")
         logger.info(f"  Components: {self.statistics['n_components']}")
-        logger.info(f"  Converged: {self.statistics['converged']}")
-        logger.info(f"  Iterations: {self.statistics['n_iter']}")
+        logger.info(f"  Converged: {self.statistics['converged']} (iters={self.statistics['n_iter']})")
+        if self.statistics.get('log_likelihood') is not None:
+            logger.info(f"  Avg Log-Likelihood: {self.statistics['log_likelihood']:.4f} | AIC: {self.statistics['aic']} | BIC: {self.statistics['bic']}")
         
         for i in range(self.statistics['n_components']):
             logger.info(f"  Component {i}:")
@@ -178,12 +234,13 @@ class TrafficProfiler:
             raise RuntimeError("Model not trained. Call train_gmm() first.")
         return self.gmm.sample(n_samples)
 
-    def sample_delay(self, n_samples: int = 1) -> np.ndarray:
+    def sample_delay(self, n_samples: int = 1, clip_bounds: bool = True) -> np.ndarray:
         """
         Generate delay samples from trained GMM.
         
         Args:
             n_samples: Number of samples to generate
+            clip_bounds: Enforce positive [min_bound_ms, max_bound_ms] bounds
         
         Returns:
             Array of delay samples in milliseconds
@@ -192,15 +249,35 @@ class TrafficProfiler:
             raise RuntimeError("Model not trained. Call train_gmm() first.")
         
         samples, _ = self.gmm.sample(n_samples)
-        return samples.flatten()
+        flat = samples.flatten()
+        if clip_bounds:
+            flat = np.clip(flat, self.min_bound_ms, self.max_bound_ms)
+        return flat
+
+    def sample_next_delay_s(self, min_ms: Optional[float] = None, max_ms: Optional[float] = None) -> float:
+        """
+        Sample a single inter-packet delay (in seconds) from the fitted GMM,
+        enforcing sensible [min_ms, max_ms] bounds for protocol stability.
+        """
+        if self.gmm is None:
+            raise RuntimeError("GMM model is not trained or loaded.")
+        lo = float(min_ms if min_ms is not None else self.min_bound_ms)
+        hi = float(max_ms if max_ms is not None else self.max_bound_ms)
+        weights = np.asarray(self.gmm.weights_, dtype=float)
+        weights = weights / np.sum(weights)
+        comp_idx = int(np.random.choice(len(weights), p=weights))
+        mean_ms = float(self.gmm.means_.flatten()[comp_idx])
+        std_ms = float(np.sqrt(max(self.gmm.covariances_.flatten()[comp_idx], 1e-6)))
+        val_ms = float(np.clip(np.random.normal(mean_ms, std_ms), lo, hi))
+        return val_ms / 1000.0
 
     def sample_bit_delay(self, bit: int, threshold_ms: float = 75.0) -> float:
         """
-        Sample delay conditioned on bit value to ensure robust covert decoding
+        Sample delay (seconds) conditioned on bit value to ensure robust covert decoding
         while preserving realistic traffic characteristics from the trained GMM components.
         """
         if self.gmm is None:
-            return 0.025 if bit == 0 else 0.125
+            raise RuntimeError("GMM model is not trained or loaded.")
         
         means = self.gmm.means_.flatten()
         covars = self.gmm.covariances_.flatten()
@@ -210,21 +287,21 @@ class TrafficProfiler:
             if not sub_indices:
                 sub_indices = [int(np.argmin(means))]
             idx = int(np.random.choice(sub_indices))
-            std = float(np.sqrt(covars[idx]))
-            val = float(np.random.normal(means[idx], min(std, 3.0)))
-            return float(np.clip(val, 15.0, 35.0)) / 1000.0
+            std = float(np.sqrt(max(covars[idx], 1e-6)))
+            val = float(np.random.normal(means[idx], min(std, 5.0)))
+            return float(np.clip(val, 10.0, max(15.0, threshold_ms - 25.0))) / 1000.0
         else:
             supra_indices = [i for i, m in enumerate(means) if m > threshold_ms + 25.0]
             if not supra_indices:
                 supra_indices = [int(np.argmax(means))]
             idx = int(np.random.choice(supra_indices))
-            std = float(np.sqrt(covars[idx]))
-            val = float(np.random.normal(means[idx], min(std, 5.0)))
-            return float(np.clip(val, 115.0, 150.0)) / 1000.0
+            std = float(np.sqrt(max(covars[idx], 1e-6)))
+            val = float(np.random.normal(means[idx], min(std, 8.0)))
+            return float(np.clip(val, threshold_ms + 25.0, self.max_bound_ms)) / 1000.0
     
     def save_model(self, filepath: str):
         """
-        Save trained model to file.
+        Save trained model and preprocessing configuration to file.
         
         Args:
             filepath: Path to save model
@@ -232,13 +309,18 @@ class TrafficProfiler:
         if self.gmm is None:
             raise RuntimeError("No model to save")
         
-        # Create directory if needed
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        parent_dir = os.path.dirname(filepath)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
         
-        # Save model and statistics
+        # Save model, preprocessing bounds, and validation statistics
         model_data = {
             'gmm': self.gmm,
             'n_components': self.n_components,
+            'min_bound_ms': self.min_bound_ms,
+            'max_bound_ms': self.max_bound_ms,
+            'dataset_source': self.dataset_source,
+            'feature_unit': 'ms',
             'statistics': self.statistics
         }
         
@@ -247,7 +329,7 @@ class TrafficProfiler:
     
     def load_model(self, filepath: str):
         """
-        Load trained model from file.
+        Load trained model and preprocessing configuration from file.
         
         Args:
             filepath: Path to model file
@@ -256,10 +338,15 @@ class TrafficProfiler:
             raise FileNotFoundError(f"Model file not found: {filepath}")
         
         model_data = joblib.load(filepath)
+        if not isinstance(model_data, dict) or 'gmm' not in model_data:
+            raise ValueError(f"Invalid GMM model file format: {filepath}")
         
         self.gmm = model_data['gmm']
-        self.n_components = model_data['n_components']
-        self.statistics = model_data['statistics']
+        self.n_components = int(model_data.get('n_components', self.gmm.n_components))
+        self.min_bound_ms = float(model_data.get('min_bound_ms', 5.0))
+        self.max_bound_ms = float(model_data.get('max_bound_ms', 500.0))
+        self.dataset_source = model_data.get('dataset_source', 'loaded_file')
+        self.statistics = model_data.get('statistics', {})
         
         logger.info(f"Model loaded from {filepath}")
         self._log_statistics()

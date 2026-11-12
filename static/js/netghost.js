@@ -76,8 +76,14 @@ function initNavigation() {
     });
   });
 
+  const path = window.location.pathname.toLowerCase();
   const initialHash = window.location.hash.replace('#', '');
-  if (initialHash && document.getElementById(`view-${initialHash}`)) {
+  
+  if (path.includes('/sender') && document.getElementById('view-sender')) {
+    showPage('sender');
+  } else if (path.includes('/receiver') && document.getElementById('view-receiver')) {
+    showPage('receiver');
+  } else if (initialHash && document.getElementById(`view-${initialHash}`)) {
     showPage(initialHash);
   } else {
     const defaultPage = document.body.getAttribute('data-default-view') || 'overview';
@@ -892,6 +898,7 @@ function initSender() {
   }
 
   if (modeSelect && timingGroup) {
+    timingGroup.style.display = modeSelect.value === 'temporal' ? 'block' : 'none';
     modeSelect.addEventListener('change', () => {
       timingGroup.style.display = modeSelect.value === 'temporal' ? 'block' : 'none';
       if (previewSection) previewSection.style.display = 'none';
@@ -1004,11 +1011,20 @@ function initSender() {
   // Real Backend Transmission Call
   if (startSendBtn) {
     startSendBtn.addEventListener('click', async () => {
-      const targetIp = document.getElementById('senderTargetIp')?.value.trim() || '127.0.0.1';
+      let targetIp = document.getElementById('senderTargetIp')?.value.trim() || '127.0.0.1';
+      // Automatically clean if user typed port (e.g. 127.0.0.1:5001 -> 127.0.0.1)
+      targetIp = targetIp.replace(/^https?:\/\//i, '').trim();
+      if (targetIp.includes(':')) {
+        targetIp = targetIp.split(':')[0].trim();
+      }
+      if (!targetIp) targetIp = '127.0.0.1';
+
       const secret = secretInput ? secretInput.value.trim() : '';
       const msg = messageInput ? messageInput.value : '';
       const mode = modeSelect ? modeSelect.value : 'header';
-      const timingProfile = document.getElementById('senderTimingProfile')?.value || 'normal';
+      const timingProfile = mode === 'temporal'
+        ? (document.getElementById('senderTimingProfile')?.value || 'normal')
+        : 'normal';
 
       if (!targetIp) {
         showToast('Validation Error: Destination IP is required', 'error');
@@ -1502,6 +1518,86 @@ function initProfiler() {
     }
   }
 
+  function setGmmStatusUI(status, loaded, stats, modelFile, errMsg) {
+    const statusText = document.getElementById('gmmStatusText');
+    const statusDot = document.getElementById('gmmStatusDot');
+    const samplesEl = document.getElementById('gmmSamplesCount');
+    const compsEl = document.getElementById('gmmComponentsCount');
+    const llEl = document.getElementById('gmmLogLikelihood');
+    const loadedEl = document.getElementById('gmmLoadedBadge');
+    const fileEl = document.getElementById('gmmModelFile');
+    const meansEl = document.getElementById('gmmMeansVal');
+    const varsEl = document.getElementById('gmmVariancesVal');
+    const weightsEl = document.getElementById('gmmWeightsVal');
+    const bicAicEl = document.getElementById('gmmBicAicVal');
+    const boundsEl = document.getElementById('gmmBoundsVal');
+
+    if (statusText) {
+      if (status === 'Trained') {
+        statusText.textContent = 'Trained ✓';
+        statusText.style.color = '#10b981';
+      } else if (status === 'Training') {
+        statusText.textContent = 'Training...';
+        statusText.style.color = '#f59e0b';
+      } else if (status === 'Failed') {
+        statusText.textContent = errMsg ? `Failed (${errMsg})` : 'Failed';
+        statusText.style.color = '#ef4444';
+      } else {
+        statusText.textContent = 'Not Trained';
+        statusText.style.color = 'var(--text-muted)';
+      }
+    }
+    if (statusDot) {
+      statusDot.className = 'metric-status-dot ' + (status === 'Trained' ? 'green' : (status === 'Failed' ? 'red' : ''));
+    }
+    if (loadedEl) {
+      loadedEl.textContent = loaded ? 'Loaded ✓' : 'Not Loaded';
+      loadedEl.style.color = loaded ? '#10b981' : 'var(--text-muted)';
+    }
+    if (fileEl && modelFile) fileEl.textContent = modelFile;
+
+    if (stats) {
+      if (samplesEl) samplesEl.textContent = stats.n_samples != null ? Number(stats.n_samples).toLocaleString() : '—';
+      if (compsEl) compsEl.textContent = stats.n_components != null ? stats.n_components : '—';
+      if (llEl) llEl.textContent = stats.log_likelihood != null ? stats.log_likelihood : '—';
+      if (meansEl && Array.isArray(stats.means)) {
+        meansEl.textContent = stats.means.map(v => Number(v).toFixed(1)).join(' / ');
+      }
+      if (varsEl && Array.isArray(stats.variances)) {
+        varsEl.textContent = stats.variances.map(v => Number(v).toFixed(1)).join(' / ');
+      }
+      if (weightsEl && Array.isArray(stats.weights)) {
+        weightsEl.textContent = stats.weights.map(v => Number(v).toFixed(3)).join(' / ');
+      }
+      if (bicAicEl) {
+        bicAicEl.textContent = (stats.bic != null && stats.aic != null) ? `${stats.bic} / ${stats.aic}` : '—';
+      }
+      if (boundsEl && stats.min_bound_ms != null && stats.max_bound_ms != null) {
+        boundsEl.textContent = `${stats.min_bound_ms} ms / ${stats.max_bound_ms} ms`;
+      }
+    } else {
+      if (samplesEl) samplesEl.textContent = '—';
+      if (compsEl) compsEl.textContent = '—';
+      if (llEl) llEl.textContent = '—';
+      if (meansEl) meansEl.textContent = '—';
+      if (varsEl) varsEl.textContent = '—';
+      if (weightsEl) weightsEl.textContent = '—';
+      if (bicAicEl) bicAicEl.textContent = '—';
+    }
+  }
+
+  async function refreshGmmStatus() {
+    try {
+      const res = await fetch('/gmm_status');
+      const data = await res.json();
+      setGmmStatusUI(data.status || (data.available ? 'Trained' : 'Not Trained'), !!data.loaded, data.statistics, data.model_file, data.error);
+    } catch (e) {
+      setGmmStatusUI('Failed', false, null, null, e.message);
+    }
+  }
+
+  refreshGmmStatus();
+
   function updateProfilerUI(data) {
     if (pcapPackets) pcapPackets.textContent = data.packets.toLocaleString();
     if (pcapDuration) pcapDuration.textContent = data.duration;
@@ -1510,6 +1606,7 @@ function initProfiler() {
     if (pcapJitter) pcapJitter.textContent = data.jitter;
     if (dropTitle) dropTitle.textContent = `✓ Active Baseline: ${data.filename}`;
     if (dropSub) dropSub.textContent = `${data.packets.toLocaleString()} packets analyzed · ${data.components} Gaussian components fitted`;
+    setGmmStatusUI(data.status || 'Trained', data.loaded !== false, data.stats, data.model_file, null);
   }
 
   if (dropzone && fileInput) {
@@ -1548,6 +1645,7 @@ function initProfiler() {
     trainBtn.addEventListener('click', async () => {
       trainBtn.disabled = true;
       trainBtn.textContent = 'Training GMM...';
+      setGmmStatusUI('Training', false, null, null, null);
       try {
         const res = await fetch('/api/profiler/train', {
           method: 'POST',
@@ -1561,13 +1659,15 @@ function initProfiler() {
           activeData = data;
           updateProfilerUI(data);
           renderProfilerChart(data);
-          showToast('✓ Gaussian Mixture Model trained successfully (3 components)', 'success');
+          showToast(`✓ Gaussian Mixture Model trained (${data.n_samples} samples, ${data.components} components)`, 'success');
         } else {
+          setGmmStatusUI('Failed', false, null, null, data.error || 'Training failed');
           showToast(data.error || 'Training failed', 'error');
         }
       } catch (e) {
         trainBtn.disabled = false;
         trainBtn.textContent = 'Train Model';
+        setGmmStatusUI('Failed', false, null, null, e.message);
         showToast(`Training error: ${e.message}`, 'error');
       }
     });
@@ -1576,15 +1676,21 @@ function initProfiler() {
   if (loadBtn) {
     loadBtn.addEventListener('click', async () => {
       try {
-        const res = await fetch('/gmm_status');
+        const res = await fetch('/api/profiler/load', { method: 'POST' });
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          throw new Error(`Unexpected non-JSON response (HTTP ${res.status})`);
+        }
         const data = await res.json();
-        if (data.available) {
-          showToast(`✓ Active GMM Model loaded (${data.statistics.n_components} components)`, 'info');
+        if (res.ok && data.success) {
+          setGmmStatusUI('Trained', true, data.statistics, data.model_file, null);
+          showToast(`✓ Loaded GMM Model (${data.statistics.n_components} components, ${data.statistics.n_samples || '?'} samples)`, 'success');
         } else {
-          showToast('No saved GMM model found. Train one first.', 'warning');
+          setGmmStatusUI(data.status || 'Not Trained', false, null, null, data.error);
+          showToast(data.error || 'No saved GMM model found. Train one first.', 'warning');
         }
       } catch (err) {
-        showToast(`Status check error: ${err.message}`, 'error');
+        showToast(`Load error: ${err.message}`, 'error');
       }
     });
   }

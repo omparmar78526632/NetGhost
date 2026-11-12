@@ -76,8 +76,14 @@ function initNavigation() {
     });
   });
 
+  const path = window.location.pathname.toLowerCase();
   const initialHash = window.location.hash.replace('#', '');
-  if (initialHash && document.getElementById(`view-${initialHash}`)) {
+  
+  if (path.includes('/sender') && document.getElementById('view-sender')) {
+    showPage('sender');
+  } else if (path.includes('/receiver') && document.getElementById('view-receiver')) {
+    showPage('receiver');
+  } else if (initialHash && document.getElementById(`view-${initialHash}`)) {
     showPage(initialHash);
   } else {
     const defaultPage = document.body.getAttribute('data-default-view') || 'overview';
@@ -1004,7 +1010,14 @@ function initSender() {
   // Real Backend Transmission Call
   if (startSendBtn) {
     startSendBtn.addEventListener('click', async () => {
-      const targetIp = document.getElementById('senderTargetIp')?.value.trim() || '127.0.0.1';
+      let targetIp = document.getElementById('senderTargetIp')?.value.trim() || '127.0.0.1';
+      // Automatically clean if user typed port (e.g. 127.0.0.1:5001 -> 127.0.0.1)
+      targetIp = targetIp.replace(/^https?:\/\//i, '').trim();
+      if (targetIp.includes(':')) {
+        targetIp = targetIp.split(':')[0].trim();
+      }
+      if (!targetIp) targetIp = '127.0.0.1';
+
       const secret = secretInput ? secretInput.value.trim() : '';
       const msg = messageInput ? messageInput.value : '';
       const mode = modeSelect ? modeSelect.value : 'header';

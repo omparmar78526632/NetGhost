@@ -1,51 +1,27 @@
 @echo off
-REM NetGhost Receiver Launcher
-REM This script must be run as Administrator
+REM NetGhost Dedicated Receiver Node Launcher (Port 5001)
+REM Run as Administrator for raw packet steganography
 
-echo.
-echo ========================================
-echo   NetGhost Receiver Launcher
-echo ========================================
+echo ===============================================================
+echo   NETGHOST - DEDICATED RECEIVER NODE (PORT 5001)
+echo ===============================================================
 echo.
 
-REM Check if running as administrator
 net session >nul 2>&1
 if %errorLevel% neq 0 (
-    echo ERROR: Not running as Administrator!
+    echo [WARNING] Not running as Administrator!
+    echo Packet sniffing and capture require Administrator privileges.
     echo.
-    echo Please right-click this file and select "Run as Administrator"
-    echo.
-    pause
-    exit /b 1
 )
 
-echo [OK] Running as Administrator
-echo.
-
-REM Activate virtual environment
 if exist .venv\Scripts\activate.bat (
-    call .venv\Scripts\activate.bat
-    echo [OK] Virtual environment activated
+    set "PY_EXE=.venv\Scripts\python.exe"
 ) else (
-    echo ERROR: Virtual environment not found!
-    echo Please run: python -m venv .venv
-    echo Then run: .venv\Scripts\activate
-    echo Then run: pip install -r requirements.txt
-    echo.
-    pause
-    exit /b 1
+    set "PY_EXE=python"
 )
 
-echo.
-echo Starting NetGhost Receiver...
-echo.
-echo Open your browser to: http://127.0.0.1:5001
-echo.
-echo Press Ctrl+C to stop the receiver
-echo.
-echo ========================================
-echo.
+echo Starting Receiver Node on http://127.0.0.1:5001/receiver ...
+start http://127.0.0.1:5001/receiver
 
-python receiver\receiver_app.py
-
+%PY_EXE% receiver/receiver_app.py
 pause
