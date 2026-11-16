@@ -135,7 +135,7 @@ A pre-trained 3-component GMM model is already saved at `ml/models/gmm_timing.pk
 
 - **Traffic Profiler:** Upload a `.pcap`/`.pcapng` (`POST /api/profiler/upload_pcap`), generate synthetic baseline traffic (`POST /api/profiler/preset`), train a 3-component GMM (`POST /api/profiler/train`), or load `ml/models/gmm_timing.pkl` (`POST /api/profiler/load`).
 - **Packet Monitor:** Start/stop live ICMP inspection (`POST /api/monitor/start`, `POST /api/monitor/stop`), clear buffer, or export captured packets as PCAP (`GET /api/monitor/export_pcap`).
-- **Experiments & Results:** Create repeatable experiment runs (`POST /api/experiments/create`), execute them (`POST /api/experiments/<id>/run`), view charts, and export results (`GET /api/results/export_report`).
+- **Experiments & Results:** Create experiment records (`POST /api/experiments/create`), run them (`POST /api/experiments/<id>/run`), and review/export measured sender-side packet count, duration, throughput, message size, and packet interval (`GET /api/results/export_report`). Receiver delivery, loss, and payload authentication are not measured by this report.
 
 ---
 
@@ -216,4 +216,3 @@ This verifies encryption, `0xDEAD` framing, channel encoding/decoding, GMM timin
 1. Click **Stop Listening** in the Receiver UI if a capture is active.
 2. Press **`Ctrl+C`** in the terminal(s) running `app.py`, `sender_app.py`, or `receiver_app.py`.
 3. Stop any active Wireshark capture.
-

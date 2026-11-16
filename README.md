@@ -336,6 +336,8 @@ Binary data is encoded in the timing intervals between successive ICMP packets.
 3. **Gamma**: Gamma distribution (models network latency)
 4. **GMM/ML**: Sample from trained Gaussian Mixture Model
 
+The delay values shown here are NetGhost demonstration defaults, not numeric parameters prescribed by the cited research papers. The references motivate the timing-profile approaches; they do not establish these exact values as research results.
+
 **Decoding Process:**
 1. Capture ICMP packets
 2. Extract packet timestamps

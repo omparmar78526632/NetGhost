@@ -765,7 +765,7 @@ const ReceptionFlow = {
         const banner = document.getElementById('flowRxDiagnosticBanner');
         const text = document.getElementById('flowRxDiagnosticText');
         if (banner && text) {
-          text.textContent = `AUTHENTICATION FAILED: ${event.error || 'Authentication tag mismatch. Check shared secret passphrase!'}`;
+          text.textContent = 'Payload authentication failed. Confirm both endpoints use the same passphrase, then resend the complete message.';
           banner.style.display = 'flex';
         }
       }
@@ -1096,6 +1096,7 @@ function initReceiver() {
   const exportBtn = document.getElementById('btnExportResult');
   const decodedTextBox = document.getElementById('receiverDecodedText');
   const authErrorBanner = document.getElementById('receiverAuthErrorBanner');
+  const authErrorText = document.getElementById('receiverAuthErrorText');
 
   const statusSync = document.getElementById('statusSync');
   const statusFraming = document.getElementById('statusFraming');
@@ -1221,6 +1222,9 @@ function initReceiver() {
           }
 
           if (msg.includes('Decryption failed')) {
+            if (authErrorText) {
+              authErrorText.textContent = 'Payload authentication failed. Confirm both endpoints use the same passphrase, then resend the complete message.';
+            }
             if (authErrorBanner) authErrorBanner.style.display = 'flex';
             if (statusAuth) statusAuth.innerHTML = '<span style="color: #ef4444; font-weight: 600;">✗ Failed</span>';
             if (statusDecrypt) statusDecrypt.innerHTML = '<span style="color: #ef4444; font-weight: 600;">✗ Failed</span>';
@@ -1838,17 +1842,40 @@ function initPacketMonitor() {
 async function fetchExperimentList() {
   try {
     const res = await fetch('/api/experiments/list');
-    if (!res.ok) return;
+    if (!res.ok) throw new Error(`Request failed with status ${res.status}`);
     const data = await res.json();
     renderExperimentsTable(data.experiments || []);
   } catch (err) {
     console.warn('Error fetching experiments:', err);
+    const tbody = document.getElementById('experimentTableBody');
+    const countLabel = document.getElementById('experimentCountLabel');
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Could not load experiments. Check the application connection and retry.</td></tr>';
+    }
+    if (countLabel) countLabel.textContent = 'Experiment data unavailable';
   }
 }
 
 function renderExperimentsTable(experiments) {
   const tbody = document.getElementById('experimentTableBody');
   if (!tbody) return;
+
+  const counts = {
+    total: experiments.length,
+    completed: experiments.filter(exp => exp.status === 'Completed').length,
+    running: experiments.filter(exp => exp.status === 'Running').length,
+    failed: experiments.filter(exp => exp.status === 'Failed').length
+  };
+  const totalCount = document.getElementById('experimentTotalCount');
+  const completedCount = document.getElementById('experimentCompletedCount');
+  const runningCount = document.getElementById('experimentRunningCount');
+  const failedCount = document.getElementById('experimentFailedCount');
+  const countLabel = document.getElementById('experimentCountLabel');
+  if (totalCount) totalCount.textContent = String(counts.total);
+  if (completedCount) completedCount.textContent = String(counts.completed);
+  if (runningCount) runningCount.textContent = String(counts.running);
+  if (failedCount) failedCount.textContent = String(counts.failed);
+  if (countLabel) countLabel.textContent = `${counts.total} experiment${counts.total === 1 ? '' : 's'} shown`;
 
   if (!experiments || experiments.length === 0) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">No experiments registered. Click "+ New Experiment" to configure a controlled run.</td></tr>`;
@@ -1859,18 +1886,19 @@ function renderExperimentsTable(experiments) {
   experiments.forEach(exp => {
     const statusClass = exp.status === 'Completed' ? 'completed' : (exp.status === 'Running' ? 'running' : (exp.status === 'Failed' ? 'failed' : 'review'));
     const isRunning = exp.status === 'Running';
+    const payloadBytes = exp.results?.payload_bytes ?? new TextEncoder().encode(exp.payload || '').length;
     html += `
-      <tr data-status="${exp.status}">
+      <tr data-status="${escapeHtml(exp.status)}">
         <td style="font-weight: 600; color: #fff;">${escapeHtml(exp.name)}</td>
-        <td class="cell-mono">${exp.channel}</td>
-        <td class="cell-mono" style="font-weight:600;">${exp.payload ? exp.payload.length + ' B' : '—'}</td>
-        <td class="cell-mono" style="font-weight:600;">${exp.results?.packets_sent || '—'}</td>
-        <td>${exp.timing_profile || 'Normal'}</td>
-        <td><span class="badge-tag ${statusClass}">${exp.status}</span></td>
-        <td style="color: var(--text-muted); font-size: 0.78rem;">${exp.created_at || '—'}</td>
+        <td class="cell-mono">${escapeHtml(exp.channel)}</td>
+        <td class="cell-mono" style="font-weight:600;">${exp.payload ? `${payloadBytes} B` : '—'}</td>
+        <td class="cell-mono" style="font-weight:600;">${exp.results?.packets_sent ?? '—'}</td>
+        <td>${escapeHtml(exp.timing_profile || 'Normal')}</td>
+        <td><span class="badge-tag ${statusClass}">${escapeHtml(exp.status)}</span></td>
+        <td style="color: var(--text-muted); font-size: 0.78rem;">${escapeHtml(exp.created_at || '—')}</td>
         <td>
-          <button class="btn btn-ghost btn-view-exp" data-id="${exp.id}" style="padding: 2px 8px; font-size: 0.76rem;">👁 View</button>
-          <button class="btn btn-ghost btn-run-exp" data-id="${exp.id}" style="padding: 2px 8px; font-size: 0.76rem; color:#60a5fa;" ${isRunning ? 'disabled' : ''}>▶ Run</button>
+          <button class="btn btn-ghost btn-view-exp" data-id="${escapeHtml(exp.id)}" style="padding: 2px 8px; font-size: 0.76rem;">👁 View</button>
+          <button class="btn btn-ghost btn-run-exp" data-id="${escapeHtml(exp.id)}" style="padding: 2px 8px; font-size: 0.76rem; color:#60a5fa;" ${isRunning ? 'disabled' : ''}>▶ Run</button>
         </td>
       </tr>
     `;
@@ -1940,19 +1968,19 @@ async function viewExperimentModal(expId) {
           <label class="form-label">Payload</label>
           <div class="cell-mono" style="background: #0b0c10; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.82rem; color:#93c5fd;">${escapeHtml(exp.payload)}</div>
         </div>
-        ${exp.results ? `
+        ${exp.results?.measurement_source === 'sender' ? `
           <div style="background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.3); border-radius: 6px; padding: 14px;">
-            <div style="font-weight: 700; color: #93c5fd; margin-bottom: 8px; font-size: 0.88rem;">Measured Performance Results:</div>
+            <div style="font-weight: 700; color: #93c5fd; margin-bottom: 8px; font-size: 0.88rem;">Sender-side Measurements:</div>
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
               <div><span style="font-size:0.75rem; color:var(--text-muted);">Packets:</span> <strong style="color:#fff;">${exp.results.packets_sent}</strong></div>
               <div><span style="font-size:0.75rem; color:var(--text-muted);">Duration:</span> <strong style="color:#fff;">${exp.results.duration_s}s</strong></div>
               <div><span style="font-size:0.75rem; color:var(--text-muted);">Throughput:</span> <strong style="color:#fff;">${exp.results.throughput_bps} bps</strong></div>
-              <div><span style="font-size:0.75rem; color:var(--text-muted);">Stealth Index:</span> <strong style="color:#34d399;">${exp.results.stealth_index}%</strong></div>
-              <div><span style="font-size:0.75rem; color:var(--text-muted);">Packet Loss:</span> <strong style="color:#fff;">${exp.results.packet_loss_pct}%</strong></div>
-              <div><span style="font-size:0.75rem; color:var(--text-muted);">Bit Error Rate:</span> <strong style="color:#fff;">${exp.results.ber_pct}%</strong></div>
+              <div><span style="font-size:0.75rem; color:var(--text-muted);">Message size:</span> <strong style="color:#fff;">${exp.results.payload_bytes ?? '—'} bytes</strong></div>
+              <div><span style="font-size:0.75rem; color:var(--text-muted);">Mean packet interval:</span> <strong style="color:#fff;">${exp.results.avg_inter_packet_delay_ms ?? '—'} ms</strong></div>
+              <div><span style="font-size:0.75rem; color:var(--text-muted);">Receiver confirmation:</span> <strong style="color:#fff;">Not measured</strong></div>
             </div>
           </div>
-        ` : '<div style="color: var(--text-muted); font-size: 0.82rem;">No execution results recorded yet. Click "Run Experiment Again".</div>'}
+        ` : exp.results?.error ? `<div style="color: #fca5a5; font-size: 0.82rem;">Run failed: ${escapeHtml(exp.results.error)}</div>` : '<div style="color: var(--text-muted); font-size: 0.82rem;">No measured sender results are available for this record. Click "Run Experiment Again" to record a new run.</div>'}
       `;
     }
 
@@ -2088,16 +2116,14 @@ async function fetchResultsData() {
     const data = await res.json();
     cachedResultsData = data;
 
-    if (data.available) {
-      const accVal = document.querySelector('#view-results .metrics-grid-4 .metric-card:nth-child(1) .metric-value');
-      if (accVal) accVal.textContent = `${data.packet_recovery_rate_pct}%`;
-
-      const pktsVal = document.querySelector('#view-results .metrics-grid-4 .metric-card:nth-child(2) .metric-value');
-      if (pktsVal) pktsVal.innerHTML = `${data.total_packets_transmitted} <span style="font-size: 1.1rem; color: var(--text-muted); font-weight: normal;">/ ${data.total_packets_transmitted}</span>`;
-
-      const delayVal = document.querySelector('#view-results .metrics-grid-4 .metric-card:nth-child(4) .metric-value');
-      if (delayVal) delayVal.innerHTML = `${data.avg_duration_s}<span style="font-size: 1rem; color: var(--text-muted); font-weight: normal; margin-left: 2px;">s</span>`;
-    }
+    const experimentCount = document.getElementById('resultsExperimentCount');
+    const packetCount = document.getElementById('resultsPacketCount');
+    const avgThroughput = document.getElementById('resultsAvgThroughput');
+    const avgDuration = document.getElementById('resultsAvgDuration');
+    if (experimentCount) experimentCount.textContent = data.available ? String(data.experiments_count) : '—';
+    if (packetCount) packetCount.textContent = data.available ? data.total_packets_transmitted.toLocaleString() : '—';
+    if (avgThroughput) avgThroughput.textContent = data.available ? `${data.avg_throughput_bps} bps` : '—';
+    if (avgDuration) avgDuration.textContent = data.available ? `${data.avg_duration_s} s` : '—';
   } catch (err) {
     console.warn('Error fetching results data:', err);
   }
@@ -2124,150 +2150,78 @@ function renderAllResultsCharts() {
 }
 
 function renderRecoveryChart() {
-  const canvas = document.getElementById('chartRecoveryRate');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const width = canvas.parentElement.clientWidth || 400;
-  const height = 150;
-  canvas.width = width;
-  canvas.height = height;
-
-  ctx.clearRect(0, 0, width, height);
-
-  ctx.strokeStyle = '#181b28';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(35, 10, width - 45, height - 35);
-
-  ctx.strokeStyle = '#3b82f6';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  const startY = height - 40;
-  const endY = 25;
-  ctx.moveTo(35, startY);
-  ctx.bezierCurveTo(width * 0.35, height - 60, width * 0.65, 35, width - 15, endY);
-  ctx.stroke();
-
-  ctx.fillStyle = '#34d399';
-  ctx.beginPath();
-  ctx.arc(width - 15, endY, 4, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.font = '10px JetBrains Mono, monospace';
-  ctx.fillStyle = '#6b7280';
-  ctx.fillText('100%', 2, 28);
-  ctx.fillText('0', 20, height - 12);
-  ctx.fillText('100% Sequence', width - 90, height - 12);
+  renderResultsBarChart('chartRecoveryRate', 'packets', '#3b82f6', 'packets');
 }
 
 function renderTransmissionTimeChart() {
-  const canvas = document.getElementById('chartTransmissionTime');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const width = canvas.parentElement.clientWidth || 400;
-  const height = 150;
-  canvas.width = width;
-  canvas.height = height;
-
-  ctx.clearRect(0, 0, width, height);
-
-  const series = cachedResultsData?.series || [];
-  const bars = series.length > 0 ? series.slice(0, 4).map(s => ({
-    label: s.name.substring(0, 10) + '...',
-    color: s.channel.includes('Header') ? '#2563eb' : '#a855f7',
-    val: Math.min(1.0, s.duration_s / 40.0)
-  })) : [
-    { label: 'Prepare', color: '#2563eb', val: 0.6 },
-    { label: 'Transmit', color: '#1d4ed8', val: 0.88 },
-    { label: 'Recover', color: '#10b981', val: 0.45 }
-  ];
-
-  const barW = 34;
-  const gap = (width - (bars.length * barW)) / (bars.length + 1);
-
-  bars.forEach((b, i) => {
-    const x = gap + i * (barW + gap);
-    const h = Math.max(8, b.val * (height - 45));
-    const y = height - 25 - h;
-
-    ctx.fillStyle = b.color;
-    ctx.beginPath();
-    ctx.roundRect(x, y, barW, h, [4, 4, 0, 0]);
-    ctx.fill();
-
-    ctx.font = '9px Inter, sans-serif';
-    ctx.fillStyle = '#9ca3af';
-    ctx.textAlign = 'center';
-    ctx.fillText(b.label, x + barW / 2, height - 8);
-  });
+  renderResultsBarChart('chartTransmissionTime', 'duration_s', '#10b981', 's');
 }
 
 function renderInterArrivalAreaChart() {
-  const canvas = document.getElementById('chartInterArrival');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const width = canvas.parentElement.clientWidth || 400;
-  const height = 150;
-  canvas.width = width;
-  canvas.height = height;
-
-  ctx.clearRect(0, 0, width, height);
-
-  const grad = ctx.createLinearGradient(0, 40, 0, height - 25);
-  grad.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
-  grad.addColorStop(1, 'rgba(16, 185, 129, 0.02)');
-
-  ctx.beginPath();
-  ctx.moveTo(10, height - 25);
-  ctx.lineTo(10, height - 40);
-  ctx.lineTo(width * 0.15, height - 55);
-  ctx.lineTo(width * 0.3, height - 45);
-  ctx.lineTo(width * 0.45, height - 75);
-  ctx.lineTo(width * 0.6, height - 60);
-  ctx.lineTo(width * 0.75, height - 85);
-  ctx.lineTo(width * 0.9, height - 50);
-  ctx.lineTo(width - 10, height - 65);
-  ctx.lineTo(width - 10, height - 25);
-  ctx.closePath();
-  ctx.fillStyle = grad;
-  ctx.fill();
-
-  ctx.strokeStyle = '#10b981';
-  ctx.lineWidth = 1.8;
-  ctx.stroke();
-
-  ctx.fillStyle = 'rgba(16, 185, 129, 0.18)';
-  ctx.fillRect(width - 65, 45, 52, 20);
-  ctx.font = '10px JetBrains Mono, monospace';
-  ctx.fillStyle = '#34d399';
-  ctx.textAlign = 'center';
-  ctx.fillText('74 ms', width - 39, 59);
+  renderResultsBarChart('chartInterArrival', 'avg_inter_packet_delay_ms', '#10b981', 'ms');
 }
 
 function renderPayloadSizeChart() {
-  const canvas = document.getElementById('chartPayloadGrowth');
+  renderResultsBarChart('chartPayloadGrowth', 'payload_bytes', '#a855f7', 'bytes');
+}
+
+function renderResultsBarChart(canvasId, valueKey, color, unit) {
+  const canvas = document.getElementById(canvasId);
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
   const width = canvas.parentElement.clientWidth || 400;
   const height = 150;
   canvas.width = width;
   canvas.height = height;
-
   ctx.clearRect(0, 0, width, height);
 
-  ctx.strokeStyle = '#a855f7';
-  ctx.lineWidth = 2.5;
+  const series = (cachedResultsData?.series || [])
+    .filter(item => item[valueKey] !== null && item[valueKey] !== undefined && Number.isFinite(Number(item[valueKey])))
+    .slice(0, 8);
+
+  if (series.length === 0) {
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No measured sender runs yet', width / 2, height / 2);
+    return;
+  }
+
+  const left = 34;
+  const right = 12;
+  const top = 14;
+  const bottom = 32;
+  const chartWidth = width - left - right;
+  const chartHeight = height - top - bottom;
+  const maxValue = Math.max(...series.map(item => Number(item[valueKey])), 1);
+  const slotWidth = chartWidth / series.length;
+  const barWidth = Math.min(36, slotWidth * 0.62);
+
+  ctx.strokeStyle = '#374151';
   ctx.beginPath();
-  ctx.moveTo(25, height - 35);
-  ctx.lineTo(width * 0.45, height - 55);
-  ctx.lineTo(width - 25, 25);
+  ctx.moveTo(left, top);
+  ctx.lineTo(left, height - bottom);
+  ctx.lineTo(width - right, height - bottom);
   ctx.stroke();
 
-  ctx.font = '10px JetBrains Mono, monospace';
-  ctx.fillStyle = '#6b7280';
-  ctx.textAlign = 'left';
-  ctx.fillText('64 B', 20, height - 10);
-  ctx.textAlign = 'right';
-  ctx.fillText('1024 B', width - 15, height - 10);
+  series.forEach((item, index) => {
+    const value = Number(item[valueKey]);
+    const barHeight = (value / maxValue) * chartHeight;
+    const x = left + index * slotWidth + (slotWidth - barWidth) / 2;
+    const y = height - bottom - barHeight;
+
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, barWidth, barHeight);
+    ctx.fillStyle = '#d1d5db';
+    ctx.font = '9px JetBrains Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${value} ${unit}`, x + barWidth / 2, Math.max(top + 9, y - 3));
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = '9px Inter, sans-serif';
+    ctx.fillText(item.name.slice(0, 9), x + barWidth / 2, height - 12);
+  });
 }
 
 /* ==========================================================================

@@ -976,7 +976,7 @@
 
           <div class="notice-banner error" id="receiverAuthErrorBanner" style="display: none;">
             <span>⚠</span>
-            <span id="receiverAuthErrorText">Authentication failed. The recovered payload could not be verified.</span>
+            <span id="receiverAuthErrorText">Payload authentication failed. Confirm both endpoints use the same passphrase, then resend the complete message.</span>
           </div>
         </section>
         {% endif %}
@@ -1397,24 +1397,24 @@
           <!-- Summary Metrics 4 Grid -->
           <div class="metrics-grid-4">
             <div class="metric-card">
-              <div class="metric-label">Active sessions</div>
-              <div class="metric-value">03</div>
-              <div class="metric-subtext" style="color:#10b981;">Controlled lab runs</div>
+              <div class="metric-label">Total experiments</div>
+              <div class="metric-value" id="experimentTotalCount">—</div>
+              <div class="metric-subtext">Saved on this node</div>
             </div>
             <div class="metric-card">
               <div class="metric-label">Completed</div>
-              <div class="metric-value">18</div>
-              <div class="metric-subtext">Across all channels</div>
+              <div class="metric-value" id="experimentCompletedCount">—</div>
+              <div class="metric-subtext">Recorded runs</div>
             </div>
             <div class="metric-card">
-              <div class="metric-label">Review queue</div>
-              <div class="metric-value">02</div>
-              <div class="metric-subtext" style="color:#f59e0b;">Needs observation</div>
+              <div class="metric-label">Running</div>
+              <div class="metric-value" id="experimentRunningCount">—</div>
+              <div class="metric-subtext">Currently executing</div>
             </div>
             <div class="metric-card">
-              <div class="metric-label">Repeatability</div>
-              <div class="metric-value">98.7%</div>
-              <div class="metric-subtext" style="color:#10b981;">Session consistency</div>
+              <div class="metric-label">Failed</div>
+              <div class="metric-value" id="experimentFailedCount">—</div>
+              <div class="metric-subtext">Runs needing attention</div>
             </div>
           </div>
 
@@ -1423,10 +1423,10 @@
             <div class="card-header">
               <div class="card-title-group">
                 <h3>Experiment registry</h3>
-                <p>Controlled sessions and comparative observations</p>
+                <p>Experiment records stored by this application instance</p>
               </div>
               <div style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">
-                ↻ Last synced 14 Mar 2025
+                  Local experiment store
               </div>
             </div>
 
@@ -1445,46 +1445,17 @@
                   </tr>
                 </thead>
                 <tbody id="experimentTableBody">
-                  <tr data-status="Completed">
-                    <td style="font-weight: 600; color: #fff;">Header Embedding Test</td>
-                    <td class="cell-mono">IP-ID</td>
-                    <td class="cell-mono" style="font-weight:600;">2.4 KB</td>
-                    <td class="cell-mono" style="font-weight:600;">128</td>
-                    <td>Normal</td>
-                    <td><span class="badge-tag completed">Completed</span></td>
-                    <td style="color: var(--text-muted);">14 Mar 2025</td>
-                    <td></td>
-                  </tr>
-                  <tr data-status="Completed">
-                    <td style="font-weight: 600; color: #fff;">Temporal Channel Test</td>
-                    <td class="cell-mono">Temporal IPD</td>
-                    <td class="cell-mono" style="font-weight:600;">1.8 KB</td>
-                    <td class="cell-mono" style="font-weight:600;">256</td>
-                    <td>GMM</td>
-                    <td><span class="badge-tag completed">Completed</span></td>
-                    <td style="color: var(--text-muted);">13 Mar 2025</td>
-                    <td><a href="#" class="btn btn-ghost" style="padding: 2px 6px; font-size: 0.76rem;">👁 View</a></td>
-                  </tr>
-                  <tr data-status="Review">
-                    <td style="font-weight: 600; color: #fff;">Authentication Recovery Check</td>
-                    <td class="cell-mono">IP-ID</td>
-                    <td class="cell-mono" style="font-weight:600;">512 B</td>
-                    <td class="cell-mono" style="font-weight:600;">32</td>
-                    <td>Constant</td>
-                    <td><span class="badge-tag review">Review</span></td>
-                    <td style="color: var(--text-muted);">12 Mar 2025</td>
-                    <td><a href="#" class="btn btn-ghost" style="padding: 2px 6px; font-size: 0.76rem;">👁 View</a></td>
-                  </tr>
+                  <tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading experiments...</td></tr>
                 </tbody>
               </table>
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
-              <div style="font-size: 0.78rem; color: var(--text-muted);">3 experiments shown</div>
+              <div id="experimentCountLabel" style="font-size: 0.78rem; color: var(--text-muted);">Loading experiments...</div>
               <div style="display: flex; gap: 6px;">
                 <span class="badge-tag completed exp-filter-tag" data-status="Completed" style="cursor: pointer;">Completed</span>
                 <span class="badge-tag running exp-filter-tag" data-status="Running" style="cursor: pointer;">Running</span>
-                <span class="badge-tag review exp-filter-tag" data-status="Review" style="cursor: pointer;">Review</span>
+                <span class="badge-tag review exp-filter-tag" data-status="Created" style="cursor: pointer;">Created</span>
                 <span class="badge-tag failed exp-filter-tag" data-status="Failed" style="cursor: pointer;">Failed</span>
               </div>
             </div>
@@ -1503,7 +1474,7 @@
                 EVALUATION WORKSPACE
               </div>
               <h2 class="page-title">Experiment Results</h2>
-              <p class="page-desc">Compare measured outcomes from controlled transmission experiments.</p>
+              <p class="page-desc">Review measured sender-side transmission metrics from completed experiments.</p>
             </div>
             <div class="page-actions">
               <select class="form-select" style="width: 150px; padding: 7px 10px;">
@@ -1520,56 +1491,53 @@
           <div class="metrics-grid-4">
             <div class="metric-card">
               <div class="metric-header">
-                <span class="metric-label">Transmission Accuracy</span>
-                <span class="metric-icon">🎯</span>
+                <span class="metric-label">Completed Runs</span>
+                <span class="metric-icon">✓</span>
               </div>
-              <div class="metric-value">98.7%</div>
-              <div class="metric-subtext" style="color:#10b981;">Measured recovery outcome</div>
+              <div class="metric-value" id="resultsExperimentCount">—</div>
+              <div class="metric-subtext">Measured sender runs</div>
             </div>
 
             <div class="metric-card">
               <div class="metric-header">
-                <span class="metric-label">Packets Recovered</span>
+                <span class="metric-label">Packets Sent</span>
                 <span class="metric-icon">📦</span>
               </div>
-              <div class="metric-value">126 <span style="font-size: 1.1rem; color: var(--text-muted); font-weight: normal;">/ 128</span></div>
-              <div class="metric-subtext">Captured packet set</div>
+              <div class="metric-value" id="resultsPacketCount">—</div>
+              <div class="metric-subtext">Count reported by sender</div>
             </div>
 
             <div class="metric-card">
               <div class="metric-header">
-                <span class="metric-label">Payload Integrity</span>
-                <span class="metric-icon">🛡</span>
+                <span class="metric-label">Average Throughput</span>
+                <span class="metric-icon">↗</span>
               </div>
-              <div class="metric-value" style="font-size: 1.25rem;">
-                <span class="badge-tag completed" style="font-size: 0.82rem;">Valid</span>
-              </div>
-              <div class="metric-subtext">Authentication verified</div>
+              <div class="metric-value" id="resultsAvgThroughput">—</div>
+              <div class="metric-subtext">bits per second</div>
             </div>
 
             <div class="metric-card">
               <div class="metric-header">
-                <span class="metric-label">Average Inter-packet Delay</span>
+                <span class="metric-label">Average Duration</span>
                 <span class="metric-icon">⏱</span>
               </div>
-              <div class="metric-value">74<span style="font-size: 1rem; color: var(--text-muted); font-weight: normal; margin-left: 2px;">ms</span></div>
-              <div class="metric-subtext">Observed timing average</div>
+              <div class="metric-value" id="resultsAvgDuration">—</div>
+              <div class="metric-subtext">seconds per run</div>
             </div>
           </div>
 
-          <!-- 2x2 High-Fidelity Charts -->
+          <!-- Charts use sender-side measurements only -->
           <div class="grid-2" style="margin-bottom: 20px;">
             <div class="chart-card">
               <div class="chart-header">
                 <div>
-                  <div class="chart-title">Packet Recovery Rate</div>
-                  <div class="chart-subtitle">Recovered packets over transmission sequence</div>
+                  <div class="chart-title">Packets Sent by Experiment</div>
+                  <div class="chart-subtitle">Packet counts reported by the sender</div>
                 </div>
                 <div class="chart-legend">
-                  <div class="legend-item"><span class="legend-color" style="background:#3b82f6;"></span> Recovery rate</div>
+                  <div class="legend-item"><span class="legend-color" style="background:#3b82f6;"></span> Packets</div>
                 </div>
               </div>
-              <div class="cell-mono" style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 8px;">98.7%</div>
               <div class="chart-canvas-wrapper">
                 <canvas id="chartRecoveryRate"></canvas>
               </div>
@@ -1579,13 +1547,12 @@
               <div class="chart-header">
                 <div>
                   <div class="chart-title">Transmission Time</div>
-                  <div class="chart-subtitle">Elapsed time by experiment stage</div>
+                  <div class="chart-subtitle">Measured elapsed time by experiment</div>
                 </div>
                 <div class="chart-legend">
                   <div class="legend-item"><span class="legend-color" style="background:#10b981;"></span> Duration</div>
                 </div>
               </div>
-              <div class="cell-mono" style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 8px;">9.4 s</div>
               <div class="chart-canvas-wrapper">
                 <canvas id="chartTransmissionTime"></canvas>
               </div>
@@ -1594,14 +1561,13 @@
             <div class="chart-card">
               <div class="chart-header">
                 <div>
-                  <div class="chart-title">Inter-arrival Time</div>
-                  <div class="chart-subtitle">Observed packet timing distribution</div>
+                  <div class="chart-title">Mean Packet Interval</div>
+                  <div class="chart-subtitle">Mean sender-measured interval by experiment</div>
                 </div>
                 <div class="chart-legend">
-                  <div class="legend-item"><span class="legend-color" style="background:#10b981;"></span> Mean IPD</div>
+                  <div class="legend-item"><span class="legend-color" style="background:#10b981;"></span> Milliseconds</div>
                 </div>
               </div>
-              <div class="cell-mono" style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 8px;">74 ms</div>
               <div class="chart-canvas-wrapper">
                 <canvas id="chartInterArrival"></canvas>
               </div>
@@ -1610,74 +1576,28 @@
             <div class="chart-card">
               <div class="chart-header">
                 <div>
-                  <div class="chart-title">Payload Size vs Packets</div>
-                  <div class="chart-subtitle">Payload growth across sampled runs</div>
+                  <div class="chart-title">Payload Bytes by Experiment</div>
+                  <div class="chart-subtitle">UTF-8 message size submitted by the experiment</div>
                 </div>
                 <div class="chart-legend">
-                  <div class="legend-item"><span class="legend-color" style="background:#a855f7;"></span> Sampled runs</div>
+                  <div class="legend-item"><span class="legend-color" style="background:#a855f7;"></span> Bytes</div>
                 </div>
               </div>
-              <div class="cell-mono" style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 8px;">2.4 KB</div>
               <div class="chart-canvas-wrapper">
                 <canvas id="chartPayloadGrowth"></canvas>
               </div>
             </div>
           </div>
 
-          <!-- Channel Comparison Matrix Table -->
           <div class="card">
-            <div class="card-header">
-              <div class="card-title-group">
-                <h3>Channel Comparison</h3>
-                <p>Measured characteristics across controlled channel implementations.</p>
-              </div>
-              <span class="badge-tag" style="background: #181b27; color: var(--text-muted); border: 1px solid var(--border-color);">
-                Illustrative evaluation
-              </span>
-            </div>
-
-            <div class="table-container">
-              <table class="custom-table">
-                <thead>
-                  <tr>
-                    <th>METRIC</th>
-                    <th>IP-ID HEADER</th>
-                    <th>TEMPORAL IPD</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td style="font-weight: 600; color: #fff;">Capacity</td>
-                    <td>Medium</td>
-                    <td>High</td>
-                  </tr>
-                  <tr>
-                    <td style="font-weight: 600; color: #fff;">Reliability</td>
-                    <td>High</td>
-                    <td>Medium</td>
-                  </tr>
-                  <tr>
-                    <td style="font-weight: 600; color: #fff;">Timing Sensitivity</td>
-                    <td>Low</td>
-                    <td>High</td>
-                  </tr>
-                  <tr>
-                    <td style="font-weight: 600; color: #fff;">Packet Modification</td>
-                    <td>Protocol field modification</td>
-                    <td>Timing variation</td>
-                  </tr>
-                  <tr>
-                    <td style="font-weight: 600; color: #fff;">Detection Considerations</td>
-                    <td>Experimental observability of IPv4 ID changes</td>
-                    <td>Experimental observability of timing patterns</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <h3 style="margin-bottom: 8px;">Measurement Scope</h3>
+            <p style="color: var(--text-secondary); line-height: 1.6;">
+              These results are measured on the sending node. This report does not verify receiver delivery, packet loss, payload integrity, or authentication; those outcomes must not be inferred from sender statistics.
+            </p>
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: var(--text-dark); margin-top: 14px;">
-            <span>Results are illustrative UI data for a controlled laboratory evaluation.</span>
+            <span>Only measured sender-side results are included. Receiver confirmation is not currently recorded.</span>
             <span>🔒 Computer Network Technology Course Project</span>
           </div>
         </section>

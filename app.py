@@ -8,6 +8,7 @@ import sys
 import queue
 import time
 import json
+import csv
 import uuid
 import threading
 import datetime
@@ -55,6 +56,7 @@ DATA_DIR = os.path.join(BASE_DIR, 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 EXPERIMENTS_FILE = os.path.join(DATA_DIR, 'experiments.json')
 SETTINGS_FILE = os.path.join(DATA_DIR, 'settings.json')
+SAMPLE_EXPERIMENT_IDS = {'exp-001', 'exp-002'}
 
 # Global instances & queues
 current_receiver = None
@@ -318,57 +320,17 @@ def load_experiments() -> list:
     if os.path.exists(EXPERIMENTS_FILE):
         try:
             with open(EXPERIMENTS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                experiments = json.load(f)
+            actual_experiments = [
+                experiment for experiment in experiments
+                if experiment.get('id') not in SAMPLE_EXPERIMENT_IDS
+            ]
+            if len(actual_experiments) != len(experiments):
+                save_experiments(actual_experiments)
+            return actual_experiments
         except Exception:
             pass
-    
-    # Initialize default baseline experiments if empty
-    default_experiments = [
-        {
-            'id': 'exp-001',
-            'name': 'Baseline IPv4 IP-ID Covert Transmission',
-            'channel': 'IP-ID Header Embedding',
-            'payload': 'CRITICAL_SECURITY_ALERT_SECTOR_7',
-            'timing_profile': 'Normal',
-            'target_ip': '127.0.0.1',
-            'interface': 'Loopback',
-            'status': 'Completed',
-            'created_at': '2026-09-15 08:30:00',
-            'started_at': '2026-09-15 08:30:02',
-            'completed_at': '2026-09-15 08:30:03',
-            'results': {
-                'packets_sent': 43,
-                'duration_s': 0.58,
-                'throughput_bps': 1186.2,
-                'stealth_index': 92.4,
-                'packet_loss_pct': 0.0,
-                'ber_pct': 0.0
-            }
-        },
-        {
-            'id': 'exp-002',
-            'name': 'Temporal IPD with GMM Web Mimicry',
-            'channel': 'Temporal IPD',
-            'payload': 'GMM_STEGANOGRAPHY_PROFILER_VERIFICATION',
-            'timing_profile': 'GMM Fitted Distribution',
-            'target_ip': '127.0.0.1',
-            'interface': 'Loopback',
-            'status': 'Completed',
-            'created_at': '2026-09-15 09:15:00',
-            'started_at': '2026-09-15 09:15:02',
-            'completed_at': '2026-09-15 09:15:38',
-            'results': {
-                'packets_sent': 585,
-                'duration_s': 35.4,
-                'throughput_bps': 16.5,
-                'stealth_index': 98.9,
-                'packet_loss_pct': 0.0,
-                'ber_pct': 0.0
-            }
-        }
-    ]
-    save_experiments(default_experiments)
-    return default_experiments
+    return []
 
 
 def save_experiments(exps: list):
@@ -1212,7 +1174,6 @@ def run_experiment(exp_id):
         if is_header:
             sender = HeaderChannelSender(target_ip)
             stats = sender.send_message(payload, passphrase)
-            stealth_score = 93.5
         else:
             sender = TemporalChannelSender(target_ip)
             profile = exp.get('timing_profile', 'normal').lower()
@@ -1225,17 +1186,24 @@ def run_experiment(exp_id):
             else:
                 profile = 'normal'
             stats = sender.send_message(payload, passphrase, timing_profile=profile, gmm_model=gmm_model)
-            stealth_score = 98.8 if profile == 'gmm' else 89.2
+
+        measured_delays = [
+            float(packet.get('actual_delay_ms', 0))
+            for packet in stats.get('transmission_log', [])[1:]
+            if float(packet.get('actual_delay_ms', 0)) > 0
+        ]
 
         exp['status'] = 'Completed'
         exp['completed_at'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         exp['results'] = {
+            'measurement_source': 'sender',
+            'payload_bytes': len(payload.encode('utf-8')),
             'packets_sent': stats['packets_sent'],
             'duration_s': round(float(stats['duration_seconds']), 2),
             'throughput_bps': round(float(stats['throughput_bps']), 1),
-            'stealth_index': stealth_score,
-            'packet_loss_pct': 0.0,
-            'ber_pct': 0.0
+            'avg_inter_packet_delay_ms': (
+                round(float(np.mean(measured_delays)), 2) if measured_delays else None
+            )
         }
         save_experiments(exps)
         log_audit_event('EXP_RUN', f"Experiment '{exp['name']}' completed successfully", 'SUCCESS')
@@ -1278,15 +1246,33 @@ def clear_all_experiments():
 @app.route('/api/results/data')
 def get_results_analytics():
     exps = load_experiments()
-    completed = [e for e in exps if e.get('status') == 'Completed' and e.get('results')]
+    completed = [
+        e for e in exps
+        if e.get('status') == 'Completed'
+        and isinstance(e.get('results'), dict)
+        and e['results'].get('measurement_source') == 'sender'
+    ]
     
     if not completed:
-        return jsonify({'available': False, 'message': 'No measured experiment results available.'})
+        return jsonify({
+            'available': False,
+            'message': 'No measured sender-side experiment results available.',
+            'experiments_count': 0,
+            'total_packets_transmitted': 0,
+            'avg_throughput_bps': None,
+            'avg_duration_s': None,
+            'avg_inter_packet_delay_ms': None,
+            'series': []
+        })
     
     throughputs = [e['results']['throughput_bps'] for e in completed]
     durations = [e['results']['duration_s'] for e in completed]
-    stealth_scores = [e['results']['stealth_index'] for e in completed]
     total_packets = sum(e['results']['packets_sent'] for e in completed)
+    measured_delays = [
+        e['results']['avg_inter_packet_delay_ms']
+        for e in completed
+        if e['results'].get('avg_inter_packet_delay_ms') is not None
+    ]
     
     series_data = []
     for e in completed:
@@ -1296,7 +1282,8 @@ def get_results_analytics():
             'throughput_bps': e['results']['throughput_bps'],
             'duration_s': e['results']['duration_s'],
             'packets': e['results']['packets_sent'],
-            'stealth_index': e['results']['stealth_index']
+            'payload_bytes': e['results']['payload_bytes'],
+            'avg_inter_packet_delay_ms': e['results'].get('avg_inter_packet_delay_ms')
         })
 
     return jsonify({
@@ -1305,9 +1292,9 @@ def get_results_analytics():
         'total_packets_transmitted': total_packets,
         'avg_throughput_bps': round(float(np.mean(throughputs)), 1),
         'avg_duration_s': round(float(np.mean(durations)), 2),
-        'avg_stealth_score': round(float(np.mean(stealth_scores)), 1),
-        'packet_recovery_rate_pct': 100.0,
-        'payload_integrity_pct': 100.0,
+        'avg_inter_packet_delay_ms': (
+            round(float(np.mean(measured_delays)), 2) if measured_delays else None
+        ),
         'series': series_data
     })
 
@@ -1315,7 +1302,12 @@ def get_results_analytics():
 @app.route('/api/results/export_report')
 def export_results_report():
     exps = load_experiments()
-    completed = [e for e in exps if e.get('status') == 'Completed' and e.get('results')]
+    completed = [
+        e for e in exps
+        if e.get('status') == 'Completed'
+        and isinstance(e.get('results'), dict)
+        and e['results'].get('measurement_source') == 'sender'
+    ]
     
     fmt = request.args.get('format', 'csv').lower()
     
@@ -1323,14 +1315,24 @@ def export_results_report():
         return jsonify({'exported_at': datetime.datetime.now().isoformat(), 'results': completed})
     
     # CSV generation
-    lines = ["Experiment ID,Name,Channel,Payload Size (B),Packets,Duration (s),Throughput (bps),Stealth Index (%),Status"]
+    output = io.StringIO(newline='')
+    writer = csv.writer(output)
+    writer.writerow([
+        'Experiment ID', 'Name', 'Channel', 'Payload Size (bytes)',
+        'Packets Sent', 'Duration (s)', 'Throughput (bps)',
+        'Average Inter-packet Delay (ms)', 'Status'
+    ])
     for e in completed:
         r = e['results']
-        lines.append(f"{e['id']},\"{e['name']}\",\"{e['channel']}\",{len(e.get('payload',''))},{r.get('packets_sent',0)},{r.get('duration_s',0)},{r.get('throughput_bps',0)},{r.get('stealth_index',0)},{e['status']}")
-    
-    csv_content = '\n'.join(lines)
+        writer.writerow([
+            e['id'], e['name'], e['channel'], r.get('payload_bytes', ''),
+            r.get('packets_sent', 0), r.get('duration_s', 0),
+            r.get('throughput_bps', 0), r.get('avg_inter_packet_delay_ms', ''),
+            e['status']
+        ])
+
     return Response(
-        csv_content,
+        output.getvalue(),
         mimetype='text/csv',
         headers={'Content-Disposition': f"attachment;filename=netghost_results_report_{int(time.time())}.csv"}
     )
