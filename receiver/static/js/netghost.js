@@ -1361,7 +1361,7 @@ function initReceiver() {
         if (statusReassembly) statusReassembly.innerHTML = '<span style="color: #60a5fa; font-weight: 600;">100%</span>';
         if (statusSync) statusSync.innerHTML = '<span style="color: #34d399; font-weight: 600;">✓ Detected</span>';
         if (statusFraming) statusFraming.innerHTML = '<span style="color: #34d399; font-weight: 600;">✓ Valid</span>';
-      } else if (data.last_error && authErrorBanner) {
+      } else if (data.last_error && !data.last_message && !data.decryption_success && authErrorBanner) {
         authErrorBanner.style.display = 'flex';
         if (statusAuth) statusAuth.innerHTML = '<span style="color: #ef4444; font-weight: 600;">✗ Failed</span>';
         if (statusDecrypt) statusDecrypt.innerHTML = '<span style="color: #ef4444; font-weight: 600;">✗ Failed</span>';

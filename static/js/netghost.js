@@ -750,7 +750,9 @@ const ReceptionFlow = {
         this.setNodeState('rxNodeCrypto', 'success', '✓ AUTH_OK');
         const banner = document.getElementById('flowRxDiagnosticBanner');
         if (banner) banner.style.display = 'none';
-      } else {
+      } else if (!messageRecovered) {
+        // Only show FAILED state if no message has been successfully recovered yet.
+        // In Temporal/GMM mode, intermediate frames may fail before the real one arrives.
         if (authEl) {
           authEl.textContent = 'FAILED';
           authEl.className = 'flow-metric-value flow-status-text error';
@@ -771,6 +773,7 @@ const ReceptionFlow = {
       }
     }
     else if (event.type === 'rx_message_recovered') {
+      messageRecovered = true;
       this.setRxState('COMPLETED');
       this.setNodeState('rxNodeSync', 'success', '✓ 0xDEAD');
       this.setNodeState('rxNodeExtraction', 'success', 'COMPLETE');
@@ -1111,10 +1114,15 @@ function initReceiver() {
   let eventSource = null;
   let packetCount = 0;
   let lastPacketTime = null;
+  // Once a message is successfully decoded, suppress any subsequent
+  // stale "Decryption failed" SSE messages (happens in Temporal/GMM mode
+  // where intermediate partial frames fail before the real frame arrives).
+  let messageRecovered = false;
 
   ReceptionFlow.init();
 
   function resetChecklist() {
+    messageRecovered = false;
     if (authErrorBanner) authErrorBanner.style.display = 'none';
     if (statusSync) statusSync.innerHTML = '<span style="color:var(--text-muted);">Listening...</span>';
     if (statusFraming) statusFraming.innerHTML = '<span style="color:var(--text-muted);">Pending</span>';
@@ -1224,7 +1232,7 @@ function initReceiver() {
             if (statusDecrypt) statusDecrypt.innerHTML = '<span style="color: #34d399; font-weight: 600;">✓ Successful</span>';
           }
 
-          if (msg.includes('Decryption failed')) {
+          if (msg.includes('Decryption failed') && !messageRecovered) {
             if (authErrorText) {
               authErrorText.textContent = 'Payload authentication failed. Confirm both endpoints use the same passphrase, then resend the complete message.';
             }
@@ -1236,6 +1244,7 @@ function initReceiver() {
 
         } else if (data.type === 'message') {
           const plainMsg = data.message;
+          messageRecovered = true;
           if (authErrorBanner) authErrorBanner.style.display = 'none';
           if (decodedTextBox) {
             decodedTextBox.innerHTML = `&gt; <span style="color:#34d399; font-weight:700;">${escapeHtml(plainMsg)}</span>`;
@@ -1364,7 +1373,7 @@ function initReceiver() {
         if (statusReassembly) statusReassembly.innerHTML = '<span style="color: #60a5fa; font-weight: 600;">100%</span>';
         if (statusSync) statusSync.innerHTML = '<span style="color: #34d399; font-weight: 600;">✓ Detected</span>';
         if (statusFraming) statusFraming.innerHTML = '<span style="color: #34d399; font-weight: 600;">✓ Valid</span>';
-      } else if (data.last_error && authErrorBanner) {
+      } else if (data.last_error && !data.last_message && !data.decryption_success && authErrorBanner) {
         authErrorBanner.style.display = 'flex';
         if (statusAuth) statusAuth.innerHTML = '<span style="color: #ef4444; font-weight: 600;">✗ Failed</span>';
         if (statusDecrypt) statusDecrypt.innerHTML = '<span style="color: #ef4444; font-weight: 600;">✗ Failed</span>';

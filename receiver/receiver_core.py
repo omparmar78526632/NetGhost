@@ -36,19 +36,35 @@ logger = logging.getLogger(__name__)
 def resolve_sniff_interfaces(interface: str = None):
     """
     Resolve network interface for Scapy sniffing.
-    On Windows with Npcap, if no interface is specified, sniffs on both the active adapter and loopback.
+
+    Strategy:
+    - If the caller passes an explicit interface name, use it.
+    - If 'loopback' or 'lo' is passed, resolve to the system loopback.
+    - If nothing is passed (default), use ONLY the loopback interface.
+      This keeps the receiver isolated from WiFi/Ethernet broadcast noise
+      when doing localhost-to-localhost covert channel experiments.
     """
-    if interface and interface != 'all':
+    # Caller gave an explicit non-default value
+    if interface and interface not in ('all', 'auto', 'lo', 'loopback', None):
         return interface
+
+    # Always try to find the Npcap/WinPcap loopback first
     try:
-        from scapy.all import conf
+        from scapy.all import conf, IFACES
+
+        # Npcap loopback is usually 'NPF_Loopback'
+        for name in IFACES:
+            if 'loopback' in str(name).lower() or 'npf_loopback' in str(name).lower():
+                return name
+
+        # Fallback: use Scapy's conf.loopback_name
         loopback = getattr(conf, 'loopback_name', None)
-        if loopback and loopback in conf.ifaces:
-            if conf.iface and conf.iface != loopback:
-                return [conf.iface, loopback]
+        if loopback and loopback in IFACES:
             return loopback
     except Exception:
         pass
+
+    # Last resort: return None (Scapy will sniff all interfaces)
     return None
 
 
@@ -276,6 +292,10 @@ class HeaderChannelReceiver:
         if len(self.uint16_values) < 2:
             return False
         
+        # AES-256-GCM envelope minimum: 16 (salt) + 12 (nonce) + 16 (tag) = 44 bytes minimum
+        # Anything smaller cannot be a valid NetGhost payload
+        AES_GCM_MIN_PAYLOAD = 44
+
         # Find all occurrences of SYNC marker 0xDEAD
         sync_indices = [i for i, val in enumerate(self.uint16_values) if val == 0xDEAD]
         if not sync_indices:
@@ -289,7 +309,14 @@ class HeaderChannelReceiver:
                 continue
             
             payload_len = self.uint16_values[sync_idx + 1]
-            if payload_len == 0 or payload_len > 65535:
+
+            # Guard: reject any payload_len that cannot possibly be a valid AES-GCM envelope.
+            # This prevents garbage ICMP packets from forming a plausible but invalid frame.
+            if payload_len < AES_GCM_MIN_PAYLOAD or payload_len > 65535:
+                logger.debug(
+                    f"Skipping sync at index {sync_idx}: payload_len={payload_len} "
+                    f"is below AES-GCM minimum ({AES_GCM_MIN_PAYLOAD}B) — not a NetGhost frame."
+                )
                 continue
             
             needed_chunks = (payload_len + 1) // 2
@@ -384,7 +411,10 @@ class HeaderChannelReceiver:
                     'error': str(e)
                 })
                 self._update_status(f"✗ Decryption failed: Check if passphrase matches sender! ({str(e)})")
-                self.uint16_values = self.uint16_values[sync_idx + 1:]
+                # Skip past the ENTIRE bad frame (sync + length + payload chunks) to avoid
+                # immediately retrying the same corrupt data on the next packet arrival.
+                skip_to = sync_idx + 2 + needed_chunks
+                self.uint16_values = self.uint16_values[skip_to:]
                 self._seq_chunks = {}
                 self._seen_icmp_seqs = set()
                 return False
@@ -424,7 +454,8 @@ class HeaderChannelReceiver:
         import struct
         payload_len = struct.unpack('>H', len_bytes)[0]
         
-        if payload_len == 0 or payload_len > 65535:
+        if payload_len == 0 or payload_len < 44 or payload_len > 65535:
+            # 44 = 16 (salt) + 12 (nonce) + 16 (tag) = AES-GCM minimum
             self.bits = self.bits[sync_idx + 1:]
             return False
         
@@ -779,7 +810,8 @@ class TemporalChannelReceiver:
         import struct
         payload_len = struct.unpack('>H', len_bytes)[0]
         
-        if payload_len == 0 or payload_len > 65535:
+        if payload_len == 0 or payload_len < 44 or payload_len > 65535:
+            # 44 = 16 (salt) + 12 (nonce) + 16 (tag) = AES-GCM minimum
             self.bits = self.bits[sync_idx + 1:]
             return
         
@@ -847,7 +879,9 @@ class TemporalChannelReceiver:
                 'error': str(e)
             })
             self._update_status(f"✗ Decryption failed: Check if passphrase matches sender! ({str(e)})")
-            self.bits = self.bits[sync_idx + 1:]
+            # Skip past the ENTIRE bad frame to avoid immediate re-attempt on next packet
+            skip_to = sync_idx + 32 + (payload_len * 8)
+            self.bits = self.bits[skip_to:]
     
     def start_listening(self, interface: str = None, timeout: int = 600):
         """
